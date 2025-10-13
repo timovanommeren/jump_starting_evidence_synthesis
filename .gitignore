@@ -4,10 +4,4 @@ Thomas_EUDA/
 asreview-makita/
 Synergy/
 .ipynb_checkpoints/
-.jupytext.toml
-00_environment.ipynb
-00_environment.py
-01_test.ipynb
-config/
-notebooks/
-API_KEY
+.env
