@@ -29,7 +29,7 @@ mkdir output\simulation\Brouwer_2019\state_files
 python -m asreview simulate data\Brouwer_2019.csv -o output\simulation\Brouwer_2019\state_files\sim_Brouwer_2019.asreview --prior-seed 535 --seed 165 --n-prior-included 1 --n-prior-excluded 1
 
 python -m asreview simulate data\Brouwer_2019.csv -o output\simulation\Brouwer_2019\state_files\sim_Brouwer_2019.asreview --prior-seed 535 --seed 165
-python -m asreview simulate data\Brouwer_2019_llm.csv -o output\simulation\Brouwer_2019_llm\state_files\sim_Brouwer_2019_llm.asreview --prior-seed 535 --seed 165 --prior-idx 38114 38115
+python -m asreview simulate data\Brouwer_2019_llm.csv -o output\simulation\Brouwer_2019_llm\state_files\sim_Brouwer_2019_llm.asreview --prior-seed 535 --seed 165 --prior-idx 
 
 python -m asreview metrics output\simulation\Brouwer_2019\state_files\sim_Brouwer_2019.asreview -o output\simulation\Brouwer_2019\metrics\metrics_sim_Brouwer_2019.json --quiet
 

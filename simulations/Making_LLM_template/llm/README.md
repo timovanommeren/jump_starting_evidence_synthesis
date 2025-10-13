@@ -19,6 +19,7 @@ pip install asreview>=2.0 asreview-insights>=1.6
 The performance on the following datasets is evaluated:
 
 - data\Brouwer_2019.csv
+- data\Brouwer_2019_llm.csv
 
 ## Run simulation
 
@@ -37,6 +38,7 @@ The following files are found in this project:
     ├── 📜jobs.bat
     ├── 📂data
     │   ├── 📜Brouwer_2019.csv
+    │   ├── 📜Brouwer_2019_llm.csv
     ├── 📂scripts
     │   ├── 📜data_describe.py
     │   ├── 📜get_plot.py
@@ -55,16 +57,30 @@ The following files are found in this project:
         |       └── 📂metrics
         |           ├── 📜metrics_sim_Brouwer_2019_`x`.json
         |           └── 📜...
+        |   └── 📂Brouwer_2019_llm
+        |       ├── 📂descriptives
+        |       |   └── 📜data_stats_Brouwer_2019_llm.json
+        |       ├── 📂state_files
+        |       |   ├── 📜sim_Brouwer_2019_llm_`x`.asreview
+        |       |   └── 📜...
+        |       └── 📂metrics
+        |           ├── 📜metrics_sim_Brouwer_2019_llm_`x`.json
+        |           └── 📜...
         ├── 📂tables
         |   ├── 📜data_descriptives.csv
         |   ├── 📜data_descriptives.xlsx
         |   ├── 📜tds_sim_Brouwer_2019.csv
         |   ├── 📜tds_sim_Brouwer_2019.xlsx
+        |   ├── 📜tds_sim_Brouwer_2019_llm.csv
+        |   ├── 📜tds_sim_Brouwer_2019_llm.xlsx
         |   ├── 📜tds_summary.csv
         |   ├── 📜tds_summary.xlsx
         |   ├── 📜metrics_sim_Brouwer_2019_metrics.csv
         |   ├── 📜metrics_sim_Brouwer_2019_metrics.xlsx
+        |   ├── 📜metrics_sim_Brouwer_2019_llm_metrics.csv
+        |   ├── 📜metrics_sim_Brouwer_2019_llm_metrics.xlsx
         |   ├── 📜metrics_summary.csv
         |   └── 📜metrics_summary.xlsx
         └── 📂figures
             ├── 📈plot_recall_Brouwer_2019.png
+            ├── 📈plot_recall_Brouwer_2019_llm.png
