@@ -13,31 +13,56 @@ mkdir output\figures
 
 
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-:::::: DATASET: Brouwer_2019
+:::::: DATASET: Sep_2021
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :: Create output folder
-mkdir output\simulation\Brouwer_2019\
-mkdir output\simulation\Brouwer_2019\metrics
+mkdir output\simulation\Sep_2021_minimal_prior\
+mkdir output\simulation\Sep_2021_minimal_prior\metrics
 
-:: Collect descriptives about the dataset Brouwer_2019
-mkdir output\simulation\Brouwer_2019\descriptives
-python scripts\data_describe.py data\Brouwer_2019.csv -o output\simulation\Brouwer_2019\descriptives\data_stats_Brouwer_2019.json
+mkdir output\simulation\Sep_2021_no_prior\
+mkdir output\simulation\Sep_2021_no_prior\metrics
+
+mkdir output\simulation\Sep_2021_llm_prior\
+mkdir output\simulation\Sep_2021_llm_prior\metrics
+
+:: Collect descriptives about the dataset Sep_2021
+mkdir output\simulation\Sep_2021\descriptives
+python scripts\data_describe.py data\Sep_2021.csv -o output\simulation\Sep_2021\descriptives\data_stats_Sep_2021.json
 
 :: Simulate runs
-mkdir output\simulation\Brouwer_2019\state_files
-python -m asreview simulate data\Brouwer_2019.csv -o output\simulation\Brouwer_2019\state_files\sim_Brouwer_2019.asreview --prior-seed 535 --seed 165 --n-prior-included 1 --n-prior-excluded 1
+mkdir output\simulation\Sep_2021_minimal_prior\state_files
+mkdir output\simulation\Sep_2021_no_prior\state_files
+mkdir output\simulation\Sep_2021_llm_prior\state_files
+python -m asreview simulate data\Sep_2021.csv -o output\simulation\Sep_2021_minimal_prior\state_files\sim_Sep_2021.asreview --prior-seed 535 --seed 165 --prior-idx 72 19
 
-python -m asreview simulate data\Brouwer_2019.csv -o output\simulation\Brouwer_2019\state_files\sim_Brouwer_2019.asreview --prior-seed 535 --seed 165
-python -m asreview simulate data\Brouwer_2019_llm.csv -o output\simulation\Brouwer_2019_llm\state_files\sim_Brouwer_2019_llm.asreview --prior-seed 535 --seed 165 --prior-idx 
+python -m asreview simulate data\Sep_2021.csv -o output\simulation\Sep_2021_no_prior\state_files\sim_Sep_2021.asreview --prior-seed 535 --seed 165
+python -m asreview simulate data\Sep_2021.csv -o output\simulation\Sep_2021_llm_prior\state_files\sim_Sep_2021.asreview --prior-seed 535 --seed 165 --prior-idx 283 284
 
-python -m asreview metrics output\simulation\Brouwer_2019\state_files\sim_Brouwer_2019.asreview -o output\simulation\Brouwer_2019\metrics\metrics_sim_Brouwer_2019.json --quiet
+python -m asreview metrics output\simulation\Sep_2021_minimal_prior\state_files\sim_Sep_2021.asreview -o output\simulation\Sep_2021_minimal_prior\metrics\metrics_sim_Sep_2021.json --quiet
+
+python -m asreview metrics output\simulation\Sep_2021_no_prior\state_files\sim_Sep_2021.asreview -o output\simulation\Sep_2021_no_prior\metrics\metrics_sim_Sep_2021.json --quiet
+
+python -m asreview metrics output\simulation\Sep_2021_llm_prior\state_files\sim_Sep_2021.asreview -o output\simulation\Sep_2021_llm_prior\metrics\metrics_sim_Sep_2021.json --quiet
+
+
 
 :: Generate plot and tables for dataset
-python scripts\get_plot.py -s output\simulation\Brouwer_2019\state_files\ -o output\figures\plot_recall_sim_Brouwer_2019.png
-python scripts\merge_metrics.py -s output\simulation\Brouwer_2019\metrics\ -o output\tables\metrics\metrics_sim_Brouwer_2019.csv
-python scripts\merge_tds.py -s output\simulation\Brouwer_2019\metrics\ -o output\tables\time_to_discovery\tds_sim_Brouwer_2019.csv
+python scripts\get_plot.py -s output\simulation\Sep_2021_minimal_prior\state_files\ -o output\figures\plot_recall_sim_Sep_2021_minimal_prior.png
+python scripts\merge_metrics.py -s output\simulation\Sep_2021_minimal_prior\metrics\ -o output\tables\metrics\metrics_sim_Sep_2021_minimal_prior.csv
+python scripts\merge_tds.py -s output\simulation\Sep_2021_minimal_prior\metrics\ -o output\tables\time_to_discovery\tds_sim_Sep_2021_minimal_prior.csv
+
+python scripts\get_plot.py -s output\simulation\Sep_2021_no_prior\state_files\ -o output\figures\plot_recall_sim_Sep_2021_no_prior.png
+python scripts\merge_metrics.py -s output\simulation\Sep_2021_no_prior\metrics\ -o output\tables\metrics\metrics_sim_Sep_2021_no_prior.csv
+python scripts\merge_tds.py -s output\simulation\Sep_2021_no_prior\metrics\ -o output\tables\time_to_discovery\tds_sim_Sep_2021_no_prior.csv
+
+python scripts\get_plot.py -s output\simulation\Sep_2021_llm_prior\state_files\ -o output\figures\plot_recall_sim_Sep_2021_llm_prior.png
+python scripts\merge_metrics.py -s output\simulation\Sep_2021_llm_prior\metrics\ -o output\tables\metrics\metrics_sim_Sep_2021_llm_prior.csv
+python scripts\merge_tds.py -s output\simulation\Sep_2021_llm_prior\metrics\ -o output\tables\time_to_discovery\tds_sim_Sep_2021_llm_prior.csv
 
 :: Merge descriptives and metrics
 python scripts\merge_descriptives.py
 python scripts\merge_metrics.py
+
+:: Generate final plot with all simulations
+::python scripts\get_plot.py -s output\tables\ -o output\figures\plot_recall_sim_all.png

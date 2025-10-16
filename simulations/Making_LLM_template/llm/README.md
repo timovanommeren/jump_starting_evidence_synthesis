@@ -18,8 +18,7 @@ pip install asreview>=2.0 asreview-insights>=1.6
 
 The performance on the following datasets is evaluated:
 
-- data\Brouwer_2019.csv
-- data\Brouwer_2019_llm.csv
+- data\Sep_2021.csv
 
 ## Run simulation
 
@@ -37,8 +36,7 @@ The following files are found in this project:
     ├── 📜README.md
     ├── 📜jobs.bat
     ├── 📂data
-    │   ├── 📜Brouwer_2019.csv
-    │   ├── 📜Brouwer_2019_llm.csv
+    │   ├── 📜Sep_2021.csv
     ├── 📂scripts
     │   ├── 📜data_describe.py
     │   ├── 📜get_plot.py
@@ -48,39 +46,25 @@ The following files are found in this project:
     │   └── 📜...
     └── 📂output
         ├── 📂simulation
-        |   └── 📂Brouwer_2019
+        |   └── 📂Sep_2021
         |       ├── 📂descriptives
-        |       |   └── 📜data_stats_Brouwer_2019.json
+        |       |   └── 📜data_stats_Sep_2021.json
         |       ├── 📂state_files
-        |       |   ├── 📜sim_Brouwer_2019_`x`.asreview
+        |       |   ├── 📜sim_Sep_2021_`x`.asreview
         |       |   └── 📜...
         |       └── 📂metrics
-        |           ├── 📜metrics_sim_Brouwer_2019_`x`.json
-        |           └── 📜...
-        |   └── 📂Brouwer_2019_llm
-        |       ├── 📂descriptives
-        |       |   └── 📜data_stats_Brouwer_2019_llm.json
-        |       ├── 📂state_files
-        |       |   ├── 📜sim_Brouwer_2019_llm_`x`.asreview
-        |       |   └── 📜...
-        |       └── 📂metrics
-        |           ├── 📜metrics_sim_Brouwer_2019_llm_`x`.json
+        |           ├── 📜metrics_sim_Sep_2021_`x`.json
         |           └── 📜...
         ├── 📂tables
         |   ├── 📜data_descriptives.csv
         |   ├── 📜data_descriptives.xlsx
-        |   ├── 📜tds_sim_Brouwer_2019.csv
-        |   ├── 📜tds_sim_Brouwer_2019.xlsx
-        |   ├── 📜tds_sim_Brouwer_2019_llm.csv
-        |   ├── 📜tds_sim_Brouwer_2019_llm.xlsx
+        |   ├── 📜tds_sim_Sep_2021.csv
+        |   ├── 📜tds_sim_Sep_2021.xlsx
         |   ├── 📜tds_summary.csv
         |   ├── 📜tds_summary.xlsx
-        |   ├── 📜metrics_sim_Brouwer_2019_metrics.csv
-        |   ├── 📜metrics_sim_Brouwer_2019_metrics.xlsx
-        |   ├── 📜metrics_sim_Brouwer_2019_llm_metrics.csv
-        |   ├── 📜metrics_sim_Brouwer_2019_llm_metrics.xlsx
+        |   ├── 📜metrics_sim_Sep_2021_metrics.csv
+        |   ├── 📜metrics_sim_Sep_2021_metrics.xlsx
         |   ├── 📜metrics_summary.csv
         |   └── 📜metrics_summary.xlsx
         └── 📂figures
-            ├── 📈plot_recall_Brouwer_2019.png
-            ├── 📈plot_recall_Brouwer_2019_llm.png
+            ├── 📈plot_recall_Sep_2021.png
