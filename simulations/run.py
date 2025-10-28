@@ -11,6 +11,25 @@ from metrics import evaluate_simulation
 #from simulation import pad_labels
 #stimulus_for_llm = ['inclusion_criteria', 'exclusion_criteria']
 
+# Parameters for running simulations
+n_simulations = 100
+stop_at_n = 100 # set to -1 to stop when all relevant records are found
+
+# Parameters for simulation (IVs)
+n_abstracts = 1
+length_abstracts = 500
+typicality = .90
+degree_jargon = .10
+llm_temperature = .7
+
+
+# Parameters for evaluation (DVs)
+tdd_threshold = 100
+wss_threshold = .95
+
+# Parameters for reproducibility
+seed = 42
+
 app = typer.Typer()
 
 @app.command()
@@ -18,7 +37,7 @@ def run(
     
     in_dir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True,
                                   help="Folder containing datasets."),
-    out_dir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True,
+    out_dir: Path = typer.Argument(..., exists=False, file_okay=False, dir_okay=True, readable=True,
                                   help="Root folder for all outputs."),
     stimulus_for_llm: str = typer.Argument(..., help="Space-separated list of stimulus for LLM.")
 ):
@@ -36,6 +55,8 @@ def run(
     for dataset in datasets:
         (out_dir / dataset).mkdir(parents=True, exist_ok=True)
         
+
+        
     # load synergy metadata
     synergy_metadata = pd.read_excel(r'C:\Users\timov\Desktop\Utrecht\Utrecht\MSBBSS\thesis_timo\Synergy\synergy_dataset_overview.xlsx')
 
@@ -46,20 +67,37 @@ def run(
 
 
 
-    ### Create smaller subset of datasets for testing ########################################################
-    selected_keys = ['Brouwer_2019']
-    subset_datasets = {k: datasets[k] for k in selected_keys if k in datasets}
-    datasets = subset_datasets
+    # ### Create smaller subset of datasets for testing ########################################################
+    # selected_keys = ['Brouwer_2019'] #['Appenzeller-Herzog_2019','Brouwer_2019', 'Moran_2021', 'van_de_Schoot_2018', 'Donners_2021']
+    # subset_datasets = {k: datasets[k] for k in selected_keys if k in datasets}
+    # datasets = subset_datasets
+    
+    # print(f"Running simulations on datasets: {list(datasets.keys())}")
+
     ##########################################################################################################
 
 
 
     ### SIMULATE AND EVALUATE #################################################################################
-    simulation_results = run_simulation(datasets, criterium=stimulus_for_llm, out_dir=out_dir, metadata=synergy_metadata, n_abstracts=1, stop_at_n=None)
+    
+    for sim in range(n_simulations):
+        run_simulation(
+            datasets,
+            criterium=stimulus_for_llm,
+            out_dir=out_dir,
+            metadata=synergy_metadata,
+            n_abstracts=n_abstracts,
+            length_abstracts=length_abstracts,
+            typicality=typicality,
+            degree_jargon=degree_jargon,
+            llm_temperature=llm_temperature,
+            tdd_threshold=tdd_threshold,
+            wss_threshold=wss_threshold,
+            seed=seed,
+            run=sim + 1,  # 1-based replicate index
+            stop_at_n=stop_at_n
+        )
 
-    print(simulation_results['Brouwer_2019']['llm'].head())
-
-    #evaluate_simulation(simulation_results, datasets, datasets_llms, minimal_prior_idx, out_dir, tdd_threshold=100, threshold=.95)
     ############################################################################################################
 
 
@@ -68,10 +106,6 @@ def run(
 @app.command()
 def hello():
     print('hello')
-
-    # output_path = os.path.join(os.getcwd(), f"output\{name_dataset}")
-    # os.makedirs(out_dir, exist_ok=True)
-    # print("Directory created at:", out_dir)
 
 if __name__ == "__main__":
     app()
