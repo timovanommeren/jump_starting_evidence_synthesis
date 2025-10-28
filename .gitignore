@@ -1,6 +1,14 @@
 .venv/
+.env
+
+
 Articles/
 Thomas_EUDA/
 asreview-makita/
 Synergy/
-.env
+simulations/__pycache__/
+simulations/output/
+simulations/output_study_100_runs_tdd/
+notebooks/
+Mini_thesis.pdf
+makita_simulations/

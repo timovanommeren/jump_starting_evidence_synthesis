@@ -1,5 +1,6 @@
 from pathlib import Path
 import pandas as pd
+import pickle
 
 import asreview
 from asreview.models.balancers import Balanced
@@ -13,25 +14,24 @@ from minimal import sample_minimal_priors
 from llm import prepare_llm_datasets
 from metrics import evaluate_simulation
 
-def run_simulation(datasets, criterium: list, out_dir: Path, metadata: pd.ExcelFile, n_abstracts: int, stop_at_n = None) -> dict:
+def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.ExcelFile, n_abstracts: int, length_abstracts: int, typicality: float, degree_jargon: float, llm_temperature: float, tdd_threshold: int, wss_threshold: float, seed: int, run: int, stop_at_n = int) -> dict:
 
-    ### PREPARE SIMULATION ###################################################################################
-    
-    
-    ### Generate abstracts and add them to datasets ###
-    datasets_llms = prepare_llm_datasets(datasets, criterium=criterium, out_dir=out_dir, metadata=metadata, n_abstracts=n_abstracts)
     ############################################################################################################
 
-    simulation_results = {}
-
-    for i, dataset_names in enumerate(datasets.keys()):
-        
-        print(f"Running simulation for dataset: {dataset_names}")
+    for dataset_names in datasets.keys():
         
         ### PREPARE SIMULATION DATA ###################################################################################
         
-        # sample minimal training set priors
-        minimal_prior_idx = sample_minimal_priors(datasets[dataset_names])
+        simulation_results = {} # clear dictionary for each dataset
+            
+        dataset_llm = prepare_llm_datasets(datasets[dataset_names], name=dataset_names, criterium=criterium, out_dir=out_dir, metadata=metadata, n_abstracts=n_abstracts, length_abstracts=length_abstracts, typicality=typicality, degree_jargon=degree_jargon, llm_temperature=llm_temperature) # Generate abstracts and add them to datasets
+        
+        # Skip this dataset if metadata not found
+        if dataset_llm is None:
+            print(f"Skipping simulation for dataset '{dataset_names}' because no metadata was found.")
+            continue
+        
+        minimal_prior_idx = sample_minimal_priors(datasets[dataset_names], seed=seed + run) # sample minimal training set priors
 
         ### SET UP ACTIVE LEARNING CYCLES #############################################################################
 
@@ -46,36 +46,48 @@ def run_simulation(datasets, criterium: list, out_dir: Path, metadata: pd.ExcelF
             asreview.ActiveLearningCycle(querier=TopDown(), stopper=IsFittable()),
             asreview.ActiveLearningCycle(
                 querier=Max(),
-                classifier=SVM(C=0.11, loss="squared_hinge"),
+                classifier=SVM(C=0.11, loss="squared_hinge", random_state=seed + run),
                 balancer=Balanced(ratio=9.8),
                 feature_extractor=Tfidf(**tfidf_kwargs),
+                stopper=NLabeled(stop_at_n)
             )
         ]
 
         alc = [
             asreview.ActiveLearningCycle(
                 querier=Max(),
-                classifier=SVM(C=0.11, loss="squared_hinge"),
-                balancer=Balanced(ratio=9.8),
+                classifier=SVM(C=0.11, loss="squared_hinge", random_state=seed + run),
+                balancer=Balanced(ratio=9.8),  
                 feature_extractor=Tfidf(**tfidf_kwargs),
+                stopper=NLabeled(stop_at_n)
             )
         ]
         
         ### RUN SIMULATION #########################################################################################
 
+        print(f"Running simulation for dataset: {dataset_names}")
+
         # Run simulation with minimal priors
-        simulate_minimal = asreview.Simulate(X=datasets[dataset_names], labels=datasets[dataset_names]["label_included"], cycles=alc, stopper=stop_at_n)
+        simulate_minimal = asreview.Simulate(X=datasets[dataset_names], labels=datasets[dataset_names]["label_included"], cycles=alc)
         simulate_minimal.label(minimal_prior_idx)
         simulate_minimal.review()
 
         # # Run simulation with LLM priors
-        simulate_llm = asreview.Simulate(X=datasets_llms[dataset_names]['dataset'], labels=datasets_llms[dataset_names]['dataset']["label_included"], cycles=alc, stopper=stop_at_n)
-        simulate_llm.label(datasets_llms[dataset_names]['prior_idx'])
+        simulate_llm = asreview.Simulate(X=dataset_llm['dataset'], labels=dataset_llm['dataset']["label_included"], cycles=alc)
+        simulate_llm.label(dataset_llm['prior_idx'])
         simulate_llm.review()
 
         # # Run simulation without priors (random start)
-        simulate_no_priors = asreview.Simulate(X=datasets[dataset_names], labels=datasets[dataset_names]["label_included"], cycles=alc_no_prior, stopper=stop_at_n)
+        simulate_no_priors = asreview.Simulate(X=datasets[dataset_names], labels=datasets[dataset_names]["label_included"], cycles=alc_no_prior)
         simulate_no_priors.review()
+        
+        # Create raw_simulations directory if it doesn't exist
+        raw_sim_dir = out_dir / dataset_names / 'raw_simulations'
+        raw_sim_dir.mkdir(parents=True, exist_ok=True)
+        
+        #save all results to csv files
+        for sim, condition in zip([simulate_minimal, simulate_llm, simulate_no_priors], ['minimal', 'llm', 'no_priors']):
+            sim._results.to_csv(raw_sim_dir / f'{condition}_run_{run}.csv', index=False)
         
         # This line drops priors. To access the dataframe before this, just use simulate._results
         df_results_minimal = simulate_minimal._results.dropna(axis=0, subset="training_set")
@@ -89,8 +101,15 @@ def run_simulation(datasets, criterium: list, out_dir: Path, metadata: pd.ExcelF
             'no_priors': df_results_no_priors
         }
         
-        print(f"Evaluating simulation results: {simulation_results}")
+        # Save each simulation so far using pickle
+        with open(out_dir / dataset_names / 'simulation_results.pkl', 'wb') as f:
+            pickle.dump(simulation_results, f)
+            
+        # #load simulation results for evaluation
+        # with open(out_dir / dataset_names / 'simulation_results.pkl', 'rb') as f:
+        #     simulation_results = pickle.load(f)
         
-        evaluate_simulation(simulation_results, datasets[dataset_names], datasets_llms[dataset_names], minimal_prior_idx, out_dir, tdd_threshold=100, threshold=.95)
+        ### EVALUATE SIMULATION RUN #####################################################################################
+        evaluate_simulation(simulation_results, datasets[dataset_names], dataset_llm, minimal_prior_idx, n_abstracts=n_abstracts, length_abstracts=length_abstracts, typicality=typicality, degree_jargon=degree_jargon, llm_temperature=llm_temperature, tdd_threshold=tdd_threshold, wss_threshold=wss_threshold, seed=seed + run, out_dir=out_dir, run=run, stop_at_n=stop_at_n)
 
-    return simulation_results
+    return
