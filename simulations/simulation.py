@@ -6,7 +6,7 @@ import asreview
 from asreview.models.balancers import Balanced
 from asreview.models.classifiers import SVM
 from asreview.models.feature_extractors import Tfidf
-from asreview.models.queriers import TopDown, Max
+from asreview.models.queriers import Random, Max
 from asreview.models.stoppers import IsFittable
 from asreview.models.stoppers import NLabeled
 
@@ -23,8 +23,10 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
         ### PREPARE SIMULATION DATA ###################################################################################
         
         simulation_results = {} # clear dictionary for each dataset
+        
+        print(f"Generating LLM priors for dataset: {dataset_names}")
             
-        dataset_llm = prepare_llm_datasets(datasets[dataset_names], name=dataset_names, criterium=criterium, out_dir=out_dir, metadata=metadata, n_abstracts=n_abstracts, length_abstracts=length_abstracts, typicality=typicality, degree_jargon=degree_jargon, llm_temperature=llm_temperature) # Generate abstracts and add them to datasets
+        dataset_llm = prepare_llm_datasets(datasets[dataset_names], name=dataset_names, criterium=criterium, out_dir=out_dir, metadata=metadata, n_abstracts=n_abstracts, length_abstracts=length_abstracts, typicality=typicality, degree_jargon=degree_jargon, llm_temperature=llm_temperature, run=run) # Generate abstracts and add them to datasets
         
         # Skip this dataset if metadata not found
         if dataset_llm is None:
@@ -43,7 +45,9 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
         }
 
         alc_no_prior = [
-            asreview.ActiveLearningCycle(querier=TopDown(), stopper=IsFittable()),
+            asreview.ActiveLearningCycle(
+                querier=Random(random_state=seed + run), 
+                stopper=IsFittable()),
             asreview.ActiveLearningCycle(
                 querier=Max(),
                 classifier=SVM(C=0.11, loss="squared_hinge", random_state=seed + run),
@@ -101,9 +105,9 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
             'no_priors': df_results_no_priors
         }
         
-        # Save each simulation so far using pickle
-        with open(out_dir / dataset_names / 'simulation_results.pkl', 'wb') as f:
-            pickle.dump(simulation_results, f)
+        # # Save each simulation so far using pickle
+        # with open(out_dir / dataset_names / 'simulation_results.pkl', 'wb') as f:
+        #     pickle.dump(simulation_results, f)
             
         # #load simulation results for evaluation
         # with open(out_dir / dataset_names / 'simulation_results.pkl', 'rb') as f:

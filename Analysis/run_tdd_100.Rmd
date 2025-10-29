@@ -1,0 +1,170 @@
+---
+title: "TDD_100"
+output: html_document
+date: "2025-10-28"
+---
+
+```{r load data}
+
+data = read.csv('simulations/output_tdd_simulation_50/all_simulation_results.csv')
+
+data_long = all_simulation_results
+
+```
+
+
+
+```{r cars}
+
+head(data_long)
+summary(data_long)
+```
+
+```{r}
+
+#transform data from wide to long format
+library(tidyr)
+data = pivot_wider(data_long,
+                   names_from = metric,
+                   values_from = value)
+```
+
+
+## Including Plots
+
+
+```{r pressure, echo=FALSE}
+
+library(ggplot2)
+ggplot(data, aes(x = reorder(as.factor(dataset), td), y = td, fill = condition)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "TD Values per Dataset and Condition",
+       x = "Dataset",
+       y = "TD Value") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 55, hjust = 1))
+
+
+```
+
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Step 1: mean per dataset x condition
+means <- data %>%
+  group_by(dataset, condition) %>%
+  summarise(mean_value = mean(td), .groups = "drop") %>%
+  pivot_wider(
+    names_from = condition,
+    values_from = mean_value
+  )
+
+# the column names created by pivot_wider()
+means <- means %>%
+  mutate(
+    contrast = .data[["llm"]] - .data[["no_priors"]]
+  ) %>%
+  select(dataset, contrast)
+
+# Step 2: join contrast back to full data
+data_with_contrast <- data %>%
+  left_join(means, by = "dataset")
+
+# Step 3: plot using that contrast to order
+ggplot(
+  data_with_contrast,
+  aes(
+    x = reorder(factor(dataset), contrast),
+    y = td,
+    color = factor(condition)
+  )
+) +
+  geom_boxplot(position = "dodge") +
+  labs(
+    title = "TD Values per Dataset and Condition (20 runs)",
+    x = "Dataset (ordered by LLM Priors − No Priors)",
+    y = "TD Value"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.background = element_rect(fill = "white", color = NA),  # inside plotting area
+    plot.background  = element_rect(fill = "white", color = NA),  # around the panel
+    legend.background = element_rect(fill = "white", color = NA), # legend box
+    legend.key = element_rect(fill = "white", color = NA),        # legend keys
+    axis.text.x = element_text(angle = 55, hjust = 1)
+  )
+
+ggsave(
+  filename = "td_boxplot.png",  # where to save
+  width = 10,                 # width in inches
+  height = 6,                 # height in inches
+  dpi = 300                   # resolution (300 is print-quality)
+)
+
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Step 1: mean per dataset x condition
+means <- data %>%
+  group_by(dataset, condition) %>%
+  summarise(mean_value = mean(td), .groups = "drop") %>%
+  pivot_wider(
+    names_from = condition,
+    values_from = mean_value
+  )
+
+# the column names created by pivot_wider()
+means <- means %>%
+  mutate(
+    contrast = .data[["llm"]] - .data[["no_priors"]]
+  ) %>%
+  select(dataset, contrast)
+
+# Step 2: join contrast back to full data
+data_with_contrast <- data %>%
+  left_join(means, by = "dataset")
+
+# compute means per dataset x condition
+plot_data <- data_with_contrast %>%
+  group_by(dataset, condition, contrast) %>%
+  summarise(td_mean = mean(td), .groups = "drop")
+
+ggplot(
+  plot_data,
+  aes(
+    x = reorder(factor(dataset), contrast),
+    y = td_mean,
+    fill = factor(condition)
+  )
+) +
+  geom_col(position = position_dodge(width = 0.8)) +
+  labs(
+    title = "Mean TD per Dataset and Condition (20 runs)",
+    x = "Dataset (ordered by LLM − No Prior)",
+    y = "Mean TD"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.background = element_rect(fill = "white", color = NA),  # inside plotting area
+    plot.background  = element_rect(fill = "white", color = NA),  # around the panel
+    legend.background = element_rect(fill = "white", color = NA), # legend box
+    legend.key = element_rect(fill = "white", color = NA),        # legend keys
+    axis.text.x = element_text(angle = 55, hjust = 1)
+  )
+
+ggsave(
+  filename = "td_barchart.png",  # where to save
+  width = 10,                 # width in inches
+  height = 6,                 # height in inches
+  dpi = 300                   # resolution (300 is print-quality)
+)
+
+```

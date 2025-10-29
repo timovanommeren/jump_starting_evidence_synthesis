@@ -12,7 +12,7 @@ from metrics import evaluate_simulation
 #stimulus_for_llm = ['inclusion_criteria', 'exclusion_criteria']
 
 # Parameters for running simulations
-n_simulations = 100
+n_simulations = 50
 stop_at_n = 100 # set to -1 to stop when all relevant records are found
 
 # Parameters for simulation (IVs)
@@ -21,7 +21,6 @@ length_abstracts = 500
 typicality = .90
 degree_jargon = .10
 llm_temperature = .7
-
 
 # Parameters for evaluation (DVs)
 tdd_threshold = 100
@@ -67,8 +66,8 @@ def run(
 
 
 
-    # ### Create smaller subset of datasets for testing ########################################################
-    # selected_keys = ['Brouwer_2019'] #['Appenzeller-Herzog_2019','Brouwer_2019', 'Moran_2021', 'van_de_Schoot_2018', 'Donners_2021']
+    ### Create smaller subset of datasets for testing ########################################################
+    # selected_keys = ['Donners_2021'] #['Appenzeller-Herzog_2019','Brouwer_2019', 'Moran_2021', 'van_de_Schoot_2018', 'Donners_2021']
     # subset_datasets = {k: datasets[k] for k in selected_keys if k in datasets}
     # datasets = subset_datasets
     
