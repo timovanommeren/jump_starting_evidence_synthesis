@@ -1,5 +1,6 @@
 import pandas as pd
 from pathlib import Path
+import json
 import dspy
 from dotenv import load_dotenv
 
@@ -7,19 +8,20 @@ load_dotenv()  # Load environment variables from .env file
 
 def generate_abstracts(name: str, stimulus: list, out_dir: Path, n_abstracts: int, length_abstracts: int, typicality: float, degree_jargon: float, llm_temperature: float, run: int) -> pd.DataFrame:
     
+    # transform typicality to list of integers (1 or 0) with the proportion equal to the inputted float value
+    typicality = [1 if i < n_abstracts * typicality else 0 for i in range(n_abstracts)]
     
     ### Create signature ###
-    lm = dspy.LM("openai/gpt-4o-mini", temperature=llm_temperature)
+    lm = dspy.LM("openai/gpt-4o-mini", temperature=llm_temperature, cache=False)
     dspy.configure(lm=lm)
 
     class MakeAbstract(dspy.Signature):
         """Generate a fake abstract based on search terms and whether it should be included or not."""
+        label_relevant: int = dspy.InputField(desc="1 for an example of an abstract and title relevant to the review; 0 for an example of an abstract and title irrelevant to the review")
         criteria: str = dspy.InputField(desc="The inclusion or exclusion criteria of the review")
-        length_abstracts: int = dspy.InputField(desc="Desired length of the abstract in words")
-        typicality: float = dspy.InputField(desc="The degree to which the generated abstracts should be typical examples or edge cases for the review topic (0-1 scale)")
-        degree_jargon: float = dspy.InputField(desc="The degree to which the generated abstracts should exist out of a long list of jargon or rather be written as a true abstract (with 1 representing an abstract full of jargon only and 0 representing a true abstract)")
-        label_included: int = dspy.InputField(desc="1 if it would perfectly fit the review; 0 if it would be returned by the given search terms but not fit the review")
-        nonce: str = dspy.InputField() 
+        length_abstracts: int = dspy.InputField(desc="The number of words that the generated abstract should approximately contain.")
+        typicality: int = dspy.InputField(desc="A binary variable representing whether an abstract should be typical (1) or atypical (0) for the review. The typical abstracts generated should be 'in the center' of the relevant or irrelevant cluster of abstracts classified by reviewers, whereas the atypical abstracts should aim to be on the 'edges' of these clusters. In other words, typical abstracts should be more representative of the review topic, whereas atypical abstracts should be more unusual or unique in their content.")
+        degree_jargon: float = dspy.InputField(desc="The degree to which the generated abstracts should exist out of a long list of jargon or rather be written as a true abstract (with 1.00 representing an abstract full of jargon only and 0.00 representing a true abstract)")
         jsonl: str = dspy.OutputField(desc='One-line JSON object: {"doi":"None","title":"...","abstract":"...","label_included":"1/0","reasoning":"..."}')
 
     make_abstract = dspy.ChainOfThought(MakeAbstract)
@@ -27,33 +29,32 @@ def generate_abstracts(name: str, stimulus: list, out_dir: Path, n_abstracts: in
     ### Generate abstracts ###  
     
     df_generated = pd.DataFrame()
-
+    
     # loop to generate multiple abstracts
     for i in range(n_abstracts):
         
-        #generate included abstract
-        included = make_abstract(
+        #generate relevant abstract
+        relevant = make_abstract(
+            label_relevant=1,
             criteria = stimulus['inclusion_criteria'],
-            label_included=1,
-            nonce=f"run-{i}",
-            extra_instructions=""
+            length_abstracts=length_abstracts,
+            typicality=typicality[i],
+            degree_jargon=degree_jargon
         ).jsonl
 
-        #generate excluded abstract
-        excluded = make_abstract(
+        #generate irrelevant abstract
+        irrelevant = make_abstract(
+            label_relevant=0,
             criteria = stimulus['exclusion_criteria'],
-            label_included=0,
-            nonce=f"run-{i}",
-            extra_instructions=""
+            length_abstracts=length_abstracts,
+            typicality=typicality[i],
+            degree_jargon=degree_jargon
         ).jsonl
-
-        #combine included and excluded abstracts into one pandas dataframe
-        data = [included, excluded]
-        data_dicts = [eval(item) for item in data]
-        df_generated = pd.concat([df_generated, pd.DataFrame(data_dicts)], ignore_index=True)
-        df_generated['label_included'] = df_generated['label_included'].astype(int)
         
-        #save generated abstracts to csv file
-        df_generated.to_csv(out_dir / name / f"llm_priors_run_{run}.csv", index=False)
+        #add the generated abstracts to the dataframe
+        df_generated = pd.concat([df_generated, pd.DataFrame([json.loads(item) for item in [relevant, irrelevant]]).astype({"label_included":int})])
+        
+    #save generated abstracts to csv file
+    df_generated.to_csv(out_dir / name / f"llm_priors_run_{run}.csv", index=False)
 
     return df_generated
