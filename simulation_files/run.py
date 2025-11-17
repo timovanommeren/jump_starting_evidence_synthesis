@@ -3,10 +3,8 @@ from pathlib import Path
 import pandas as pd
 
 
-from minimal import sample_minimal_priors
-from llm import prepare_llm_datasets
 from simulation import run_simulation
-from metrics import evaluate_simulation
+from metrics import aggregate_recall_plots
 
 #from simulation import pad_labels
 #stimulus_for_llm = ['inclusion_criteria', 'exclusion_criteria']
@@ -50,6 +48,17 @@ def run(
     # import all the of the datasets
     datasets = {file.stem: pd.read_csv(file) for file in data_paths}
 
+    # ### Create smaller subset of datasets for testing ########################################################
+    # selected_keys = ['Walker_2018', 'Wassenaar_2017', 'Hall_2012', 'Brouwer_2019', 'Moran_2021', 'Leenaars_2020', 'Muthu_2021']
+    # subset_datasets = {k: datasets[k] for k in selected_keys if k in datasets}
+    # datasets = subset_datasets
+    
+    # print(f"Running simulations on datasets: {list(datasets.keys())}")
+
+    ##########################################################################################################
+
+    ### CREATE OUTPUT DIRECTORIES #############################################################################
+
     # create output directories for each dataset
     for dataset in datasets:
         (out_dir / dataset).mkdir(parents=True, exist_ok=True)
@@ -66,14 +75,7 @@ def run(
 
 
 
-    ### Create smaller subset of datasets for testing ########################################################
-    # selected_keys = ['Donners_2021'] #['Appenzeller-Herzog_2019','Brouwer_2019', 'Moran_2021', 'van_de_Schoot_2018', 'Donners_2021']
-    # subset_datasets = {k: datasets[k] for k in selected_keys if k in datasets}
-    # datasets = subset_datasets
-    
-    # print(f"Running simulations on datasets: {list(datasets.keys())}")
 
-    ##########################################################################################################
 
 
 
@@ -81,7 +83,7 @@ def run(
     
     for sim in range(n_simulations):
         run_simulation(
-            datasets,
+            datasets=datasets,
             criterium=stimulus_for_llm,
             out_dir=out_dir,
             metadata=synergy_metadata,
@@ -99,6 +101,16 @@ def run(
 
     ############################################################################################################
 
+
+    ### RETURN AGGREGATE RECALL PLOTS ##########################################################################
+    
+    aggregate_recall_plots(
+        datasets=datasets, 
+        out_dir=out_dir, 
+        stop_at_n=stop_at_n
+    )
+    
+    ############################################################################################################
 
     return  
 

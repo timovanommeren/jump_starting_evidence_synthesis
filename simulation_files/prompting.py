@@ -54,7 +54,10 @@ def generate_abstracts(name: str, stimulus: list, out_dir: Path, n_abstracts: in
         #add the generated abstracts to the dataframe
         df_generated = pd.concat([df_generated, pd.DataFrame([json.loads(item) for item in [relevant, irrelevant]]).astype({"label_included":int})])
         
-    #save generated abstracts to csv file
-    df_generated.to_csv(out_dir / name / f"llm_priors_run_{run}.csv", index=False)
+    #save generated abstracts to csv file in new directory
+    path_abstracts = out_dir / name / f"llm_abstracts/llm_abstracts_run_{run}.csv"
+    path_abstracts.parent.mkdir(parents=True, exist_ok=True)
+    df_generated.to_csv(path_abstracts, index=False)
+
 
     return df_generated

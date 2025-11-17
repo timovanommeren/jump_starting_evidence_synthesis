@@ -1,8 +1,11 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from pathlib import Path
-import json
+
+import matplotlib
+matplotlib.use("Agg")   # headless, no Tk
+import matplotlib.pyplot as plt
+
 
 from asreview.metrics import loss
 from asreview.metrics import ndcg
@@ -27,6 +30,46 @@ def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset
     if stop_at_n != -1:
 
     ### METRICS FOR N-STOP != NONE ###########################################################################################
+
+        # concatenate the three cumulative sum results in one dataframe for adding metadata and plotting
+        df_cumsum = pd.DataFrame({
+            'Minimal Priors': simulation_results['minimal']["label"].cumsum()[:stop_at_n].reset_index(drop=True),
+            'LLM Priors': simulation_results['llm']["label"].cumsum()[:stop_at_n].reset_index(drop=True),
+            'No Priors': simulation_results['no_priors']["label"].cumsum()[:stop_at_n].reset_index(drop=True)
+        })
+    
+        ### GENERATE PLOTS ############################################################################################################
+        
+        plt.figure(figsize=(10, 6))
+
+        # Use 1-based x-axis: screening 1 through stop_at_n
+        x_axis = range(1, len(df_cumsum['Minimal Priors']) + 1)
+        plt.plot(x_axis, df_cumsum['Minimal Priors'], label='Minimal Priors', color='blue')
+        plt.plot(x_axis, df_cumsum['LLM Priors'], label='LLM Priors', color='green')
+        plt.plot(x_axis, df_cumsum['No Priors'], label='No Priors', color='red')
+
+        # Add dashed line at stop_at_n
+        plt.axvline(x=stop_at_n, color='red', linestyle='--', label='stopped screening')
+
+        plt.xlabel('Number of Records Screened')
+        plt.ylabel('Number of Relevant Records Found')
+        plt.title('Number of Relevant Records Found vs. Number of Records Screened')
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        
+        # save plot to output_path
+        
+        #create subfolder for recalls plots
+        recalls_folder = out_dir / dataset_names / 'recalls_plots'
+        recalls_folder.mkdir(parents=True, exist_ok=True)
+
+        plot_path = recalls_folder / f'recall_plot_run_{run}.png'
+        plt.savefig(plot_path)
+        plt.close()
+        
+        ################################################################################################################
+        
 
         td_minimal = tdd_at(simulation_results['minimal'], tdd_threshold)[1]
         td_llm = tdd_at(simulation_results['llm'], tdd_threshold)[1]
@@ -162,37 +205,81 @@ def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset
         df_results = pd.DataFrame(results_rows)
         master_file = out_dir / 'all_simulation_results.csv' 
         df_results.to_csv(master_file, mode='a', header=not master_file.exists(), index=False)
-
-    # # Save detailed reproducibility info
-    # metadata = {
-    #     'minimal_prior_idx': minimal_prior_idx.tolist(),
-    #     'llm_prior_idx': dataset_llms['prior_idx'].tolist(),
-    #     'seed': seed,
-    #     'all_parameters': {
-    #         'n_abstracts': n_abstracts,
-    #         'temperature': temperature,
-    #         'tdd_threshold': tdd_threshold,
-    #         'wss_threshold': threshold
-    #     }
-    # }
-
-
-    # with open(out_dir / dataset_names / 'reproducibility_metadata.json', 'w') as f:
-    #     json.dump(metadata, f, indent=2)
-        
-    # metric_names = ["nrr", "ndcg", "td", "atd", "wss"]
-
-    # df_metrics = (
-    #     pd.DataFrame({
-    #         "metric": metric_names,
-    #         'Minimal Priors': [nrr_minimal, ndcg_score_minimal, td_minimal, atd_minimal, all_wss_minimal[1][idx_minimal]],
-    #         'LLM Priors': [nrr_llm, ndcg_score_llm, td_llm, atd_llm, all_wss_llm[1][idx_llm]],
-    #         'No Priors': [nrr_no_priors, ndcg_score_no_priors, td_no_priors, atd_no_priors, all_wss_no_priors[1][idx_no_priors]]
-    #     })
-    #     .set_index("metric")
-    # )
-
-    # # save metrics dataframe to output_path
-    # df_metrics.to_csv(out_dir / dataset_names / "simulation_metrics.csv", index=False)
         
     return 
+
+def aggregate_recall_plots(datasets: dict, out_dir: Path, stop_at_n: int) -> None:
+  
+  for name in datasets.keys():
+      
+    raw_output = out_dir / name / 'raw_simulations'
+        
+    minimal_runs = []
+    llm_runs = []
+    no_priors_runs = []
+
+    # loop over all csv files in raw_output
+    for file in Path(raw_output).glob('*.csv'):
+        df = pd.read_csv(file)
+
+        #drop the first rows if it contains NaN
+        df = df.dropna(axis=0, subset=["training_set"])
+        
+        # check if the file is minimal priors, llm or no priors
+        if 'minimal' in file.name:
+            minimal_runs.append(df)
+        elif 'llm' in file.name:
+            llm_runs.append(df)
+        elif 'no_priors' in file.name:
+            no_priors_runs.append(df)   
+            
+    # For each method, first calculate cumsum for each run, then compute mean and SEM across runs
+    minimal_cumsums = [df['label'].cumsum().reset_index(drop=True) for df in minimal_runs]
+    agg_minimal = pd.DataFrame({
+        'Cumulative Sum': pd.concat(minimal_cumsums, axis=1).mean(axis=1),
+        'SE': pd.concat(minimal_cumsums, axis=1).sem(axis=1)
+    })
+
+    llm_cumsums = [df['label'].cumsum().reset_index(drop=True) for df in llm_runs]
+    agg_llm = pd.DataFrame({
+        'Cumulative Sum': pd.concat(llm_cumsums, axis=1).mean(axis=1),
+        'SE': pd.concat(llm_cumsums, axis=1).sem(axis=1)
+    })
+
+    no_priors_cumsums = [df['label'].cumsum().reset_index(drop=True) for df in no_priors_runs]
+    agg_no_priors = pd.DataFrame({
+        'Cumulative Sum': pd.concat(no_priors_cumsums, axis=1).mean(axis=1),
+        'SE': pd.concat(no_priors_cumsums, axis=1).sem(axis=1)
+    })
+
+
+    # plot the aggregated recall curves 
+    plt.figure(figsize=(10, 6))
+
+    # Use 1-based x-axis: screening 1 through stop_at_n
+    x_axis = range(1, len(agg_minimal['Cumulative Sum'][:stop_at_n]) + 1)
+    plt.plot(x_axis, agg_minimal['Cumulative Sum'][:stop_at_n], label='Minimal Priors', color='blue')
+    plt.fill_between(x_axis, agg_minimal['Cumulative Sum'][:stop_at_n] - agg_minimal['SE'][:stop_at_n], agg_minimal['Cumulative Sum'][:stop_at_n] + agg_minimal['SE'][:stop_at_n], color='royalblue', alpha=0.3)
+
+    x_axis = range(1, len(agg_llm['Cumulative Sum'][:stop_at_n]) + 1)
+    plt.plot(x_axis, agg_llm['Cumulative Sum'][:stop_at_n], label='LLM Priors', color='green')
+    plt.fill_between(x_axis, agg_llm['Cumulative Sum'][:stop_at_n] - agg_llm['SE'][:stop_at_n], agg_llm['Cumulative Sum'][:stop_at_n] + agg_llm['SE'][:stop_at_n], color='forestgreen', alpha=0.3)
+
+    x_axis = range(1, len(agg_no_priors['Cumulative Sum'][:stop_at_n]) + 1)
+    plt.plot(x_axis, agg_no_priors['Cumulative Sum'][:stop_at_n], label='No Priors', color='red')
+    plt.fill_between(x_axis, agg_no_priors['Cumulative Sum'][:stop_at_n] - agg_no_priors['SE'][:stop_at_n], agg_no_priors['Cumulative Sum'][:stop_at_n] + agg_no_priors['SE'][:stop_at_n], color='lightsalmon', alpha=0.3)
+
+    # Add dashed line at stop_at_n
+    plt.axvline(x=stop_at_n, color='black', linestyle='--', label='stop screening')
+
+    plt.xlabel('Number of Records Screened')
+    plt.ylabel('Number of Relevant Records Found')
+    plt.title('Number of Relevant Records Found vs. Number of Records Screened')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    
+    # save plot to output_path
+    plot_path = out_dir / name / 'aggregate_recall_plot.png'
+    plt.savefig(plot_path)
+    plt.close()

@@ -12,3 +12,24 @@ simulations/output_study_100_runs_tdd/
 notebooks/
 Mini_thesis.pdf
 makita_simulations/
+
+
+# remove the results of simulations
+simulation_results/*
+
+
+# remove all files in Report/ except the files and folders listed below
+Report/*
+
+# latex files to keep
+!Report/main.tex
+!Report/main.pdf
+!Report/preamble.tex
+!Report/titlepage.tex
+!Report/results_paragraph.tex
+!Report/references.bib
+
+# folders to keep
+!Report/vector_space/
+!Report/results/
+!Report/images/

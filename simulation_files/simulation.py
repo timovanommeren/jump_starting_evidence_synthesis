@@ -25,9 +25,9 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
         simulation_results = {} # clear dictionary for each dataset
         
         print(f"Generating LLM priors for dataset: {dataset_names}")
-            
+    
         dataset_llm = prepare_llm_datasets(datasets[dataset_names], name=dataset_names, criterium=criterium, out_dir=out_dir, metadata=metadata, n_abstracts=n_abstracts, length_abstracts=length_abstracts, typicality=typicality, degree_jargon=degree_jargon, llm_temperature=llm_temperature, run=run) # Generate abstracts and add them to datasets
-        
+  
         # Skip this dataset if metadata not found
         if dataset_llm is None:
             print(f"Skipping simulation for dataset '{dataset_names}' because no metadata was found.")
@@ -63,7 +63,7 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
                 classifier=SVM(C=0.11, loss="squared_hinge", random_state=seed + run),
                 balancer=Balanced(ratio=9.8),  
                 feature_extractor=Tfidf(**tfidf_kwargs),
-                stopper=NLabeled(stop_at_n)
+                stopper=NLabeled(stop_at_n if stop_at_n == -1 else stop_at_n + 2 * n_abstracts) # account for added LLM priors
             )
         ]
         
