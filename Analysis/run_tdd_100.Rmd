@@ -3,168 +3,423 @@ title: "TDD_100"
 output: html_document
 date: "2025-10-28"
 ---
+```{r}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(ggtext)
+library(forcats)
+library(stringr)
+library(modelsummary)
+library(Hmisc)
+library(broom)    
+library(readr)       
+library(emmeans)
+library(lme4)
+library(stargazer)
+#library(here)
+
+
+
+#here('Analysis') necessary ?
+```
+
+## Loading and transforming data
 
 ```{r load data}
-
-data = read.csv('simulations/output_tdd_simulation_50/all_simulation_results.csv')
-
-data_long = all_simulation_results
-
+simulation_data_long = read.csv("../simulations/users_meeting/all_simulation_results.csv") #path to simulation results
+metadata_datasets <- read.csv('../Analysis/percentage_relevant.csv') #path to metadata about datasets
 ```
 
-
-
-```{r cars}
-
-head(data_long)
-summary(data_long)
-```
 
 ```{r}
-
 #transform data from wide to long format
-library(tidyr)
-data = pivot_wider(data_long,
+data = pivot_wider(simulation_data_long,
+                   id_cols    = c(dataset, condition, run),
                    names_from = metric,
                    values_from = value)
+
+#change column name metadata_datasets from Dataset to dataset to match data
+colnames(metadata_datasets)[colnames(metadata_datasets) == 'Dataset'] <- 'dataset'
+
+
+# add ''Records' and 'pct' to data from metadata_datasets based on column id 'dataset'
+data <- data %>%
+  left_join(metadata_datasets %>% select(dataset, Records, pct, Topics), by = "dataset")
 ```
 
 
-## Including Plots
-
-
-```{r pressure, echo=FALSE}
-
-library(ggplot2)
-ggplot(data, aes(x = reorder(as.factor(dataset), td), y = td, fill = condition)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  labs(title = "TD Values per Dataset and Condition",
-       x = "Dataset",
-       y = "TD Value") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 55, hjust = 1))
-
-
-```
-
-
+## Descriptives
 
 ```{r}
-library(dplyr)
-library(tidyr)
-library(ggplot2)
+head(data)
+summary(data)
 
-# Step 1: mean per dataset x condition
-means <- data %>%
-  group_by(dataset, condition) %>%
-  summarise(mean_value = mean(td), .groups = "drop") %>%
-  pivot_wider(
-    names_from = condition,
-    values_from = mean_value
-  )
-
-# the column names created by pivot_wider()
-means <- means %>%
-  mutate(
-    contrast = .data[["llm"]] - .data[["no_priors"]]
-  ) %>%
-  select(dataset, contrast)
-
-# Step 2: join contrast back to full data
-data_with_contrast <- data %>%
-  left_join(means, by = "dataset")
-
-# Step 3: plot using that contrast to order
-ggplot(
-  data_with_contrast,
-  aes(
-    x = reorder(factor(dataset), contrast),
-    y = td,
-    color = factor(condition)
-  )
-) +
-  geom_boxplot(position = "dodge") +
-  labs(
-    title = "TD Values per Dataset and Condition (20 runs)",
-    x = "Dataset (ordered by LLM Priors − No Priors)",
-    y = "TD Value"
-  ) +
-  theme_minimal() +
-  theme(
-    panel.background = element_rect(fill = "white", color = NA),  # inside plotting area
-    plot.background  = element_rect(fill = "white", color = NA),  # around the panel
-    legend.background = element_rect(fill = "white", color = NA), # legend box
-    legend.key = element_rect(fill = "white", color = NA),        # legend keys
-    axis.text.x = element_text(angle = 55, hjust = 1)
-  )
-
-ggsave(
-  filename = "td_boxplot.png",  # where to save
-  width = 10,                 # width in inches
-  height = 6,                 # height in inches
-  dpi = 300                   # resolution (300 is print-quality)
-)
+#export summary data to latex format text file
 
 ```
 
+
+### Descriptive plots
+
+#### Bar chart of number of relevant records found per dataset and condition
+
 ```{r}
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-
-# Step 1: mean per dataset x condition
-means <- data %>%
-  group_by(dataset, condition) %>%
-  summarise(mean_value = mean(td), .groups = "drop") %>%
-  pivot_wider(
-    names_from = condition,
-    values_from = mean_value
-  )
-
-# the column names created by pivot_wider()
-means <- means %>%
-  mutate(
-    contrast = .data[["llm"]] - .data[["no_priors"]]
-  ) %>%
-  select(dataset, contrast)
-
-# Step 2: join contrast back to full data
-data_with_contrast <- data %>%
-  left_join(means, by = "dataset")
-
-# compute means per dataset x condition
-plot_data <- data_with_contrast %>%
-  group_by(dataset, condition, contrast) %>%
-  summarise(td_mean = mean(td), .groups = "drop")
 
 ggplot(
   plot_data,
-  aes(
-    x = reorder(factor(dataset), contrast),
-    y = td_mean,
-    fill = factor(condition)
-  )
+  aes(x = dataset,
+      y = td_mean,
+      fill = factor(condition))
 ) +
-  geom_col(position = position_dodge(width = 0.8)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(aes(ymin = td_mean - td_se, ymax = td_mean + td_se),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  geom_hline(yintercept = 100,
+             linetype = "dashed",
+             color = "black",
+             linewidth = 0.4) +
   labs(
-    title = "Mean TD per Dataset and Condition (20 runs)",
-    x = "Dataset (ordered by LLM − No Prior)",
-    y = "Mean TD"
+    title = "The number of relevant records found per dataset",
+    x = "Datasets <span style='color:#888888;'>(ordered by percentage of relevant records)</span>", 
+    y = "Number of relevant records",
+    fill = "Examples given before screening:"              # <-- legend title
+  ) +
+  scale_fill_manual(                      # <-- your colors + order + labels
+    values = c(
+      llm       = "chartreuse3",
+      minimal   = "blue",
+      no_priors = "red"
+      
+    ),
+    breaks = c("llm", "minimal", "no_priors"),
+    labels = c("LLM-generated", "True examples", "None")
   ) +
   theme_minimal() +
   theme(
-    panel.background = element_rect(fill = "white", color = NA),  # inside plotting area
-    plot.background  = element_rect(fill = "white", color = NA),  # around the panel
-    legend.background = element_rect(fill = "white", color = NA), # legend box
-    legend.key = element_rect(fill = "white", color = NA),        # legend keys
-    axis.text.x = element_text(angle = 55, hjust = 1)
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.title.x = element_markdown(),  # enables HTML styling for x label
+    axis.title.y = element_markdown(),   # enables HTML styling for y label
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background  = element_rect(fill = "white", color = NA),
+    legend.background = element_rect(fill = "white", color = NA),
+    legend.key = element_rect(fill = "white", color = NA),
+    plot.margin = margin(10, 20, 10, 10),
+    axis.text.x = element_text(angle = 55, hjust = 1),
+    legend.position = "top"               # optional
   )
 
 ggsave(
-  filename = "td_barchart.png",  # where to save
+  filename = "../Report/results/td_barchart.png",  # where to save
   width = 10,                 # width in inches
   height = 6,                 # height in inches
   dpi = 300                   # resolution (300 is print-quality)
 )
+```
+
+```{r}
+#create data with only walker
+
+walker_diff <- simulation_data_long %>% 
+  filter(dataset == "Leenaars_2020", metric == "td") %>% 
+  select(run, condition, value) %>% 
+  pivot_wider(
+    names_from  = condition,
+    values_from = value
+  ) %>% 
+  mutate(diff_llm_no = llm - no_priors)
+
+
+ggplot(walker_diff, aes(x = diff_llm_no)) +
+  geom_histogram(aes(y = ..density..), bins = 10, alpha = 0.6) +
+  geom_density(linewidth = 0.8) +
+  labs(
+    x = "td_llm − td_no_priors (per run)",
+    y = "Density",
+    title = "Distribution of td difference (LLM vs no priors) – Walker_2018"
+  )
+
+ggplot(walker_diff, aes(x = diff_llm_no)) +
+  stat_ecdf(linewidth = 0.8) +
+  labs(
+    x = "td_llm − td_no_priors",
+    y = "Empirical CDF",
+    title = "ECDF of td difference – Walker_2018"
+  )
+
+ggplot(walker_diff, aes(x = "", y = diff_llm_no)) +
+  geom_boxplot(width = 0.2, outlier.shape = NA) +
+  geom_jitter(width = 0.05, height = 0, alpha = 0.6) +
+  labs(
+    x = NULL,
+    y = "td_llm − td_no_priors",
+    title = "Run-wise differences in td – Walker_2018"
+  ) +
+  theme(axis.text.x = element_blank())
+
+ggplot(walker_diff, aes(x = "", y = diff_llm_no)) +
+  geom_violin(trim = FALSE, alpha = 0.6) +
+  geom_jitter(width = 0.05, height = 0, alpha = 0.6) +
+  labs(x = NULL, y = "td_llm − td_no_priors")
+
+
+ggplot(walker_diff, aes(sample = diff_llm_no)) +
+  stat_qq() +
+  stat_qq_line() +
+  labs(
+    title = "QQ plot of td difference – Walker_2018",
+    x = "Theoretical quantiles",
+    y = "Sample quantiles"
+  )
+
+
+library(ggdist)
+
+ggplot(walker_diff, aes(x = diff_llm_no, y = 1)) +
+  stat_halfeye(point_interval = median_qi) +
+  labs(
+    x = "td_llm − td_no_priors",
+    y = NULL,
+    title = "Sampling distribution of td difference – Walker_2018"
+  ) +
+  theme(axis.text.y = element_blank())
+
 
 ```
+
+
+
+
+```{r}
+
+# Step 1: mean per dataset x condition (to compute contrast)
+means <- data %>%
+  group_by(dataset, condition) %>%
+  summarise(mean_value = mean(td), .groups = "drop") %>%
+  pivot_wider(names_from = condition, values_from = mean_value) %>%
+  mutate(contrast = .data[["llm"]] - .data[["no_priors"]]) %>%
+  select(dataset, contrast)
+
+# Step 2: join contrast back to full data
+data_with_contrast <- data %>% left_join(means, by = "dataset")
+
+# Step 3: compute mean and SE per dataset x condition
+plot_data <- data_with_contrast %>%
+  group_by(dataset, condition, contrast) %>%
+  summarise(
+    n = n(),
+    td_mean = mean(td),
+    td_se   = sd(td) / sqrt(n),
+    .groups = "drop"
+  ) %>%
+  tidyr::replace_na(list(td_se = 0))   # if only 1 obs, sd = NA → set SE to 0
+
+
+# Join % to your plot_data and set the x-order by pct (descending = highest % first)
+plot_data <- plot_data %>%
+  left_join(metadata_datasets %>% select(dataset, pct), by = c("dataset" = "dataset")) %>%
+  mutate(dataset = fct_reorder(
+    paste0(dataset, " (", pct, "%)"),
+    pct, .desc = TRUE))
+
+```
+
+
+
+
+
+## Data Analysis
+
+### Checking for outliers and linearity
+
+```{r}
+
+ggplot(
+        subset(data, !dataset %in% c("Walker_2018", "Brouwer_2019")),
+      aes(x = Records, y = td)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm",
+              aes(color = "linear"),
+              se = FALSE) +
+  geom_smooth(method = "lm",
+              formula = y ~ x + I(x^2),
+              aes(color = "quadratic"),
+              se = FALSE) +
+  labs(
+    title = "Scatter plot of Records vs. Number of relevant records found",
+    x = "Number of Records",
+    y = "Number of relevant records found in first 100 screened"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background  = element_rect(fill = "white", color = NA),
+    legend.background = element_rect(fill = "white", color = NA),
+    legend.key = element_rect(fill = "white", color = NA),
+    plot.margin = margin(10, 20, 10, 10)
+  )
+
+```
+
+```{r}
+#check the assumption of homogeneity of variance across conditions
+ggplot(data, aes(x = condition, y = td)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.1, alpha = .3)
+```
+
+```{r, echo=FALSE}}
+# check the assumption of linearity between temperature and td for each condition
+ggplot(data, aes(x = temperature, y = td, color = condition)) +
+  geom_point(alpha = .3) +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth(method = "lm", formula = y ~ x + I(x^2), se = FALSE, linetype = "dashed") +
+  theme_minimal()
+```
+
+
+
+### Mixed effects model
+
+```{r}
+model0 <- lm(td ~ 1, data = data)
+summary(model0)
+
+model1 <- lmer(td ~ 1 + (1|dataset), REML = F, data = data)
+summary(model1)
+anova(model1, model0)
+
+Intercept_variances = as.data.frame(VarCorr(model1))
+
+ICC = Intercept_variances[Intercept_variances$grp == 'dataset','vcov'] / (Intercept_variances[Intercept_variances$grp == 'dataset','vcov'] + Intercept_variances[Intercept_variances$grp == 'Residual','vcov'])
+
+```
+
+When running a regular linear model and thus ignoring the multi-level structure present in the data, we get an intercept ($\beta_{00} = 26.791$, $SE = 0.425$), meaning that on average, across all datasets and conditions, 26.791 relevant records were found within the first 100 screened. When running a mixed effects model with dataset as a random intercept, we see that the variance in the number of relevant records found between datasets is substantial. The variance estimate of the random intercept is  ($\tau_{00} = 359.5$, $SE = 18.96$), versus a residual variance of ($\sigma^2 = 113.4$, $SE = 10.65$). The intraclass correlation coefficient (ICC) is 0.76 indicating that most of the variance in the outcome can be attributed to differences between datasets in terms of the number of relevant records found within the first 100 screened. This supports the use of a mixed effects model. This is furthermore supported by a likelihood ratio test comparing the mixed effects model to the simple linear model shows that including the random intercept significantly improves model fit ($\chi^2(1) = 3587.5$, $p < .001$).
+
+```{r}
+model2 <- lmer(td ~ condition + (1|dataset), REML = F, data = data)
+summary(model2)
+```
+
+
+```{r}
+model3 <- lmer(td ~ condition + Records + pct + (1|dataset), REML = F, data = data)
+summary(model3)
+```
+
+```{r}
+model4 <- lmer(td ~ condition + Records + pct + (condition|dataset), REML = F, data = data)
+summary(model4)
+```
+
+```{r}
+model5 <- lmer(td ~ condition + Records + pct + condition*pct + (condition|dataset), REML = F, data = data)
+summary(model5)
+```
+
+
+
+### Simple linear model
+
+```{r}
+
+#set reference category for regression model
+data <- data %>% mutate(condition = relevel(factor(condition), ref = "llm"))
+
+#run model
+lm_basic <- lm(td ~ condition, data = data)
+
+#store results in summary objects 
+summary_basic <- summary(lm_basic)
+anova_basic <- anova(lm_basic)
+
+```
+
+
+
+```{r}
+
+lm_interaction_records <- lm(td ~ Records * condition, data = data)
+summary(lm_interaction_records)
+
+```
+
+
+```{r}
+
+primary <- data %>%
+  mutate(Topic_primary = str_trim(str_extract(Topics, "^[^,]+")),
+         Topic_primary = factor(Topic_primary))
+
+lm_interaction_topics <- lm(td ~ condition * Topic_primary, data = primary)
+summary(lm_interaction_topics)
+```
+
+
+## Exporting Results
+
+
+```{r}
+
+p_apa <- function(p) ifelse(is.na(p), "NA", ifelse(p < .001, "$p$ < .001", sprintf("$p$ = %.3f", p)))
+
+
+#undo scientific notation
+options(scipen = 999)
+
+# limit to 2 decimal places
+
+
+  
+# ---- Build LaTeX paragraph
+latex_text <- paste0(
+  "We fit a linear regression to examine whether initialization affected the number of ",
+  "relevant records found within the first 100 screenings. ",
+  "The LLM-initialized model yielded on average \\textit{B} = ", round(summary_basic$coefficients[1, 1],2),
+  ", \\textit{SE} = ", round(summary_basic$coefficients[1, 2],2),
+  ", \\textit{t} = ", round(summary_basic$coefficients[1, 3],2),
+  ". ",
+
+  "Interestingly, this is approximately equal to number of papers found in the random-initialization condition, at a difference of:, ",
+  "\\textit{B} = ", round(summary_basic$coefficients[2, 1],2),
+  ", \\textit{SE} = ", round(summary_basic$coefficients[2, 2],2),
+  ", \\textit{t} = ", round(summary_basic$coefficients[2, 3],2),
+  ", ", p_apa(summary_basic$coefficients[2, 4]),
+  ". ",
+  
+  "In contrast, the difference between the LLM-initialization and the no-initialization conditions was statistically significant: ",
+  "\\textit{B} = ", round(summary_basic$coefficients[3, 1],2),
+  ", \\textit{SE} = ", round(summary_basic$coefficients[3, 2],2),
+  ", \\textit{t} = ", round(summary_basic$coefficients[3, 3],2),
+  ", ", p_apa(summary_basic$coefficients[3, 4]),
+  ".\n",
+  "Overall model fit was $R^2$ = ", round(summary_basic$r.squared,2),
+  ", adjusted $R^2$ = ", round(summary_basic$adj.r.squared,2),
+  ", and $F(", Df1, ", ", Df2, ")$ = ", round(summary_basic$fstatistic[1],2),
+  ", \\textit{p} = ", p_apa(anova_basic$'Pr(>F)'[1]), "."
+)
+
+# ---- Print LaTeX to console (or write to a .tex file)
+cat(latex_text)
+writeLines(latex_text, "../Report/results/results_paragraph.tex")
+
+```
+
+
+```{r}
+
+stargazer(
+  lm_basic, lm_interaction_records,
+  type = "latex",
+  title = "Effect of initialization on the number relevant records found in first 100 screened",
+  dep.var.labels = "Outcome: number of records found",
+  column.labels = c("Effect across datasets"),
+  header = FALSE,
+  digits = 3,
+  out = "../Report/results/results_table.tex"
+)
+
+```
+

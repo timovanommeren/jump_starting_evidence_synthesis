@@ -1,0 +1,45 @@
+% preamble.tex
+\usepackage[a4paper, margin=2.5cm]{geometry}  % Page size & margins
+\usepackage{graphicx}   % Figures
+\usepackage{booktabs}   % Professional tables
+\usepackage{amsmath}    % Math symbols & equations
+\usepackage{amssymb}    % More math symbols
+\usepackage{hyperref}   % Hyperlinks
+\usepackage{cleveref}   % Smart references
+\usepackage{enumitem}   % Customizable lists
+\usepackage{float}      % Better table/figure placement
+\usepackage[utf8]{inputenc}  % Ensure Overleaf uses UTF-8 encoding
+\usepackage{csquotes}   % Improved quotation formatting
+\usepackage{tabularx}
+\usepackage{tabularray}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows}
+\usepackage{pgfplotstable,siunitx,xfp}
+\pgfplotsset{compat=1.18}
+\usepackage{siunitx}   % \num, rounding/formatting
+\usepackage{xfp}       % or expl3; xfp gives \fpeval
+\usepackage{titling} 
+\usepackage{verbatim} % for \verbatiminput
+\newcommand*\wordcount{%
+  % run texcount & save result in jobname.wc:
+  \immediate\write18{texcount -merge -sum \jobname.tex > \jobname.wc}%
+  % read the first line (total words) from that file
+  \verbatiminput[fontsize=\small, firstline=1, lastline=1]{\jobname.wc}%
+}
+
+% Bibliography
+\usepackage[backend=biber, style=authoryear, sorting=nyt]{biblatex}  
+\addbibresource{references.bib}  % Link to your Zotero export
+
+% Section number depth
+\setcounter{secnumdepth}{3}
+
+% Table & figure captions
+\usepackage[labelfont=bf]{caption}  
+
+
+
+
+
+
+

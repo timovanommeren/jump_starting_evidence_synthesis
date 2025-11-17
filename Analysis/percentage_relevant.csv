@@ -1,0 +1,27 @@
+Nr,Dataset,Topics,Records,Included,pct
+1,Appenzeller-Herzog_2019,Medicine,2873,26,0.9
+2,Bos_2018,Medicine,4878,10,0.2
+3,Brouwer_2019,"Psychology, Medicine",38114,62,0.2
+4,Chou_2003,Medicine,1908,15,0.8
+5,Chou_2004,Medicine,1630,9,0.6
+6,Donners_2021,Medicine,258,15,5.8
+7,Hall_2012,Computer science,8793,104,1.2
+8,Jeyaraman_2020,Medicine,1175,96,8.2
+9,Leenaars_2019,"Psychology, Chemistry, Medicine",5812,17,0.3
+10,Leenaars_2020,Medicine,7216,583,8.1
+11,Meijboom_2021,Medicine,882,37,4.2
+12,Menon_2022,Medicine,975,74,7.6
+13,Moran_2021,"Biology, Medicine",5214,111,2.1
+14,Muthu_2021,Medicine,2719,336,12.4
+15,Nelson_2002,Medicine,366,80,21.9
+16,Oud_2018,"Psychology, Medicine",952,20,2.1
+17,Radjenovic_2013,Computer science,5935,48,0.8
+18,Sep_2021,Psychology,271,40,14.8
+19,Smid_2020,"Computer science, Mathematics",2627,27,1.0
+20,van_de_Schoot_2018,"Psychology, Medicine",4544,38,0.8
+21,van_der_Valk_2021,"Medicine, Psychology",725,89,12.3
+22,van_der_Waal_2022,Medicine,1970,33,1.7
+23,van_Dis_2020,"Psychology, Medicine",9128,72,0.8
+24,Walker_2018,"Biology, Medicine",48375,762,1.6
+25,Wassenaar_2017,"Medicine, Biology, Chemistry",7668,111,1.4
+26,Wolters_2018,Medicine,4280,19,0.4
