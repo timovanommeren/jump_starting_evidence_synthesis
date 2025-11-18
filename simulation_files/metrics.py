@@ -64,7 +64,7 @@ def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset
         recalls_folder = out_dir / dataset_names / 'recalls_plots'
         recalls_folder.mkdir(parents=True, exist_ok=True)
 
-        plot_path = recalls_folder / f'recall_plot_run_{run}.png'
+        plot_path = recalls_folder / f'recall_plot_run_{run}_IVs_{n_abstracts}_{length_abstracts}_{typicality}_{degree_jargon}_{llm_temperature}.png'
         plt.savefig(plot_path)
         plt.close()
         
