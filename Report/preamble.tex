@@ -20,12 +20,7 @@
 \usepackage{xfp}       % or expl3; xfp gives \fpeval
 \usepackage{titling} 
 \usepackage{verbatim} % for \verbatiminput
-\newcommand*\wordcount{%
-  % run texcount & save result in jobname.wc:
-  \immediate\write18{texcount -merge -sum \jobname.tex > \jobname.wc}%
-  % read the first line (total words) from that file
-  \verbatiminput[fontsize=\small, firstline=1, lastline=1]{\jobname.wc}%
-}
+\usepackage{catchfile}
 
 % Bibliography
 \usepackage[backend=biber, style=authoryear, sorting=nyt]{biblatex}  
@@ -36,6 +31,17 @@
 
 % Table & figure captions
 \usepackage[labelfont=bf]{caption}  
+
+ % Word count command
+\newcommand{\wordcount}{%
+  % Run texcount on the main document (jobname.tex)
+  %  - stdout -> \jobname.wc
+  %  - stderr (warnings) -> nul (ignored)
+  \immediate\write18{texcount -inc -sum -0 -template={SUM} \jobname.tex > \jobname.wc 2> nul}%
+  % Read the result from the temporary file:
+  \CatchFileDef{\wcresult}{\jobname.wc}{}%
+  \wcresult
+}
 
 
 
