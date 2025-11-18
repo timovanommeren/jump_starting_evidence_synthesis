@@ -1,0 +1,333 @@
+---
+title: "TDD_100"
+output: html_document
+date: "2025-10-28"
+---
+```{r}
+library(here)
+
+source(here("Analysis/R/00_packages.R"))
+source(here("Analysis/R/01_load_data.R"))
+source(here("Analysis/R/02_prepare_data.R"))
+source(here("Analysis/R/03_descriptives.R"))
+# source(here("R/04_models.R"))
+# source(here("R/05_plots.R"))
+
+load_packages()
+
+```
+
+## Loading and transforming data
+
+```{r load and transform data}
+
+# import simulation results and metadata
+raw <- load_simulation_data()
+
+# (1) transform simulation data to wide
+# (2) adjust metadata column names, and, 
+# (3) add the number of records and percentage of relevant records from metadata to simulation data (these will serve as group-level predictors in multilevel model)
+processed <- prepare_data(raw$simulation, raw$meta)
+
+# assign to variables for easier access
+simulation_long <- raw$simulation
+simulation      <- processed$simulation
+metadata        <- processed$meta
+
+```
+
+
+## Descriptives
+
+### Summary statistics
+
+```{r}
+head(simulation)
+summary(simulation)
+
+#export summary data to latex format text file 
+```
+
+
+### Descriptive plots
+
+#### Bar chart of number of relevant records found per dataset and condition
+
+```{r}
+
+descriptive_barchart(simulation, metadata)
+
+```
+
+
+```{r, eval=FALSE}
+#create data with only walker
+
+walker_diff <- simulation_long %>% 
+  filter(dataset == "Leenaars_2020", metric == "td") %>% 
+  select(run, condition, value) %>% 
+  pivot_wider(
+    names_from  = condition,
+    values_from = value
+  ) %>% 
+  mutate(diff_llm_no = llm - no_priors)
+
+
+ggplot(walker_diff, aes(x = diff_llm_no)) +
+  geom_histogram(aes(y = ..density..), bins = 10, alpha = 0.6) +
+  geom_density(linewidth = 0.8) +
+  labs(
+    x = "td_llm − td_no_priors (per run)",
+    y = "Density",
+    title = "Distribution of td difference (LLM vs no priors) – Walker_2018"
+  )
+
+ggplot(walker_diff, aes(x = diff_llm_no)) +
+  stat_ecdf(linewidth = 0.8) +
+  labs(
+    x = "td_llm − td_no_priors",
+    y = "Empirical CDF",
+    title = "ECDF of td difference – Walker_2018"
+  )
+
+ggplot(walker_diff, aes(x = "", y = diff_llm_no)) +
+  geom_boxplot(width = 0.2, outlier.shape = NA) +
+  geom_jitter(width = 0.05, height = 0, alpha = 0.6) +
+  labs(
+    x = NULL,
+    y = "td_llm − td_no_priors",
+    title = "Run-wise differences in td – Walker_2018"
+  ) +
+  theme(axis.text.x = element_blank())
+
+ggplot(walker_diff, aes(x = "", y = diff_llm_no)) +
+  geom_violin(trim = FALSE, alpha = 0.6) +
+  geom_jitter(width = 0.05, height = 0, alpha = 0.6) +
+  labs(x = NULL, y = "td_llm − td_no_priors")
+
+
+ggplot(walker_diff, aes(sample = diff_llm_no)) +
+  stat_qq() +
+  stat_qq_line() +
+  labs(
+    title = "QQ plot of td difference – Walker_2018",
+    x = "Theoretical quantiles",
+    y = "Sample quantiles"
+  )
+
+
+library(ggdist)
+
+ggplot(walker_diff, aes(x = diff_llm_no, y = 1)) +
+  stat_halfeye(point_interval = median_qi) +
+  labs(
+    x = "td_llm − td_no_priors",
+    y = NULL,
+    title = "Sampling distribution of td difference – Walker_2018"
+  ) +
+  theme(axis.text.y = element_blank())
+
+
+```
+
+
+
+## Data Analysis
+
+### Checking for outliers and linearity
+
+```{r}
+
+ggplot(
+        subset(simulation, !dataset %in% c("Walker_2018", "Brouwer_2019")),
+      aes(x = Records, y = td)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm",
+              aes(color = "linear"),
+              se = FALSE) +
+  geom_smooth(method = "lm",
+              formula = y ~ x + I(x^2),
+              aes(color = "quadratic"),
+              se = FALSE) +
+  labs(
+    title = "Scatter plot of Records vs. Number of relevant records found",
+    x = "Number of Records",
+    y = "Number of relevant records found in first 100 screened"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background  = element_rect(fill = "white", color = NA),
+    legend.background = element_rect(fill = "white", color = NA),
+    legend.key = element_rect(fill = "white", color = NA),
+    plot.margin = margin(10, 20, 10, 10)
+  )
+
+```
+
+
+```{r}
+#check the assumption of homogeneity of variance across conditions
+ggplot(simulation, aes(x = condition, y = td)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.1, alpha = .3)
+```
+
+
+```{r, run=FALSE}}
+# check the assumption of linearity between pct and td
+ggplot(subset(simulation, !dataset %in% c("Walker_2018", "Brouwer_2019")),
+       aes(x = pct, y = td)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm",
+              aes(color = "linear"),
+              se = FALSE) +
+  geom_smooth(method = "lm",
+              formula = y ~ x + I(x^2),
+              aes(color = "quadratic"),
+              se = FALSE) +
+  labs(
+    title = "Scatter plot of Percentage of relevant records vs. Number of relevant records found",
+    x = "Percentage of relevant records",
+    y = "Number of relevant records found in first 100 screened"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background  = element_rect(fill = "white", color = NA),
+    legend.background = element_rect(fill = "white", color = NA),
+    legend.key = element_rect(fill = "white", color = NA),
+    plot.margin = margin(10, 20, 10, 10)
+  )
+
+```
+
+
+
+### Mixed effects model
+
+A bottom-up modeling approach is used to build the mixed effects model. We start with an intercept-only model and subsequently add fixed effects and random slopes. At each step, we evaluate whether the addition of parameters significantly improves model fit using likelihood ratio tests.
+
+####
+
+```{r}
+#set reference category for regression model
+simulation <- simulation %>% mutate(condition = relevel(factor(condition), ref = "llm"))
+```
+
+
+
+#### Intercept only model
+
+```{r}
+model1 <- lmer(td ~ 1 + (1|dataset), REML = F, data = simulation)
+summary(model1)
+```
+
+```{r}
+Intercept_variances = as.data.frame(VarCorr(model1))
+
+ICC = Intercept_variances[Intercept_variances$grp == 'dataset','vcov'] / (Intercept_variances[Intercept_variances$grp == 'dataset','vcov'] + Intercept_variances[Intercept_variances$grp == 'Residual','vcov'])
+
+print(ICC)
+```
+
+
+
+```{r}
+#step forward with AIC?
+
+model2 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + (1|dataset), REML = F, data = simulation)
+summary(model2)
+anova(model2, model1)
+```
+
+
+```{r}
+model3 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + Records + pct + (1|dataset), REML = F, data = simulation)
+summary(model3)
+anova(model3, model2)
+```
+
+```{r}
+model4 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + Records + pct + (condition|dataset), REML = F, data = simulation)
+summary(model4)
+anova(model4, model3)
+```
+
+The negative correlations between the random intercepts and random slopes indicate that in datasets where performance under the reference condition (LLM) is higher than average, the drop in performance when using minimal or no_priors instead of LLM is larger than average. In other words, the effect of initialization was more pronounced for datasets where the overall performance was higher in general. Some datasets are simply easier for the active learning model of ASReview: many relevant records can be found early. In those ‘easier’ datasets, LLM-based initialization tends to create an especially large advantage over minimal or no_priors, which is reflected in the strong negative correlations between the random intercept and the random slopes.
+
+```{r}
+model5 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + Records + pct + condition*pct + (condition|dataset), REML = F, data = simulation)
+summary(model5)
+anova(model5, model4)
+```
+
+
+## Exporting Results
+
+
+```{r}
+
+p_apa <- function(p) ifelse(is.na(p), "NA", ifelse(p < .001, "$p$ < .001", sprintf("$p$ = %.3f", p)))
+
+
+#undo scientific notation
+options(scipen = 999)
+
+# limit to 2 decimal places
+
+
+  
+# ---- Build LaTeX paragraph
+latex_text <- paste0(
+  "We fit a linear regression to examine whether initialization affected the number of ",
+  "relevant records found within the first 100 screenings. ",
+  "The LLM-initialized model yielded on average \\textit{B} = ", round(summary_basic$coefficients[1, 1],2),
+  ", \\textit{SE} = ", round(summary_basic$coefficients[1, 2],2),
+  ", \\textit{t} = ", round(summary_basic$coefficients[1, 3],2),
+  ". ",
+
+  "Interestingly, this is approximately equal to number of papers found in the random-initialization condition, at a difference of:, ",
+  "\\textit{B} = ", round(summary_basic$coefficients[2, 1],2),
+  ", \\textit{SE} = ", round(summary_basic$coefficients[2, 2],2),
+  ", \\textit{t} = ", round(summary_basic$coefficients[2, 3],2),
+  ", ", p_apa(summary_basic$coefficients[2, 4]),
+  ". ",
+  
+  "In contrast, the difference between the LLM-initialization and the no-initialization conditions was statistically significant: ",
+  "\\textit{B} = ", round(summary_basic$coefficients[3, 1],2),
+  ", \\textit{SE} = ", round(summary_basic$coefficients[3, 2],2),
+  ", \\textit{t} = ", round(summary_basic$coefficients[3, 3],2),
+  ", ", p_apa(summary_basic$coefficients[3, 4]),
+  ".\n",
+  "Overall model fit was $R^2$ = ", round(summary_basic$r.squared,2),
+  ", adjusted $R^2$ = ", round(summary_basic$adj.r.squared,2),
+  ", and $F(", Df1, ", ", Df2, ")$ = ", round(summary_basic$fstatistic[1],2),
+  ", \\textit{p} = ", p_apa(anova_basic$'Pr(>F)'[1]), "."
+)
+
+# ---- Print LaTeX to console (or write to a .tex file)
+cat(latex_text)
+writeLines(latex_text, "../Report/results/results_paragraph.tex")
+
+```
+
+
+```{r}
+
+stargazer(
+  model1, model2, model3, model4, model5,
+  type = "latex",
+  title = "Effect of initialization on the number relevant records found in first 100 screened",
+  dep.var.labels = "Outcome: number of records found",
+  column.labels = c(""),
+  header = FALSE,
+  digits = 3,
+  out = here::here("Report/results/results_table.tex")
+)
+
+```
+
