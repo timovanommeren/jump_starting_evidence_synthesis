@@ -1,6 +1,7 @@
 import pandas as pd
 from pathlib import Path
 import json
+import re
 import dspy
 from dotenv import load_dotenv
 
@@ -51,11 +52,25 @@ def generate_abstracts(name: str, stimulus: list, out_dir: Path, n_abstracts: in
             degree_jargon=degree_jargon
         ).jsonl
         
-        #add the generated abstracts to the dataframe
-        df_generated = pd.concat([df_generated, pd.DataFrame([json.loads(item) for item in [relevant, irrelevant]]).astype({"label_included":int})])
+        
+        # clean control characters that may cause a JSON parsing errors
+        cleaned_relevant = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', relevant)
+        cleaned_irrelevant = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', irrelevant)
+        
+        # add the generated abstracts to the dataframe with error handling
+        try:
+            parsed_data = [json.loads(item) for item in [cleaned_relevant, cleaned_irrelevant]]
+            df_generated = pd.concat([df_generated, pd.DataFrame(parsed_data).astype({"label_included":int})])
+            
+        except json.JSONDecodeError as error:
+            print(f"\n=== JSON Parsing Error on iteration {i} of run {run} ===")
+            print(f"Error: {error}")
+            print(f"\nRelevant JSON (first 200 chars): {cleaned_relevant[:200]}...")
+            print(f"\nIrrelevant JSON (first 200 chars): {cleaned_irrelevant[:200]}...")
+            raise
         
     #save generated abstracts to csv file in new directory
-    path_abstracts = out_dir / name / f"llm_abstracts/llm_abstracts_run_{run}.csv"
+    path_abstracts = out_dir / name / f"llm_abstracts/llm_abstracts_run_{run}_IVs_{n_abstracts}_{length_abstracts}_{typicality}_{degree_jargon}_{llm_temperature}.csv"
     path_abstracts.parent.mkdir(parents=True, exist_ok=True)
     df_generated.to_csv(path_abstracts, index=False)
 

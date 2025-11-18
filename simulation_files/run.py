@@ -1,6 +1,7 @@
 import typer 
 from pathlib import Path
 import pandas as pd
+import itertools
 
 
 from simulation import run_simulation
@@ -10,15 +11,15 @@ from metrics import aggregate_recall_plots
 #stimulus_for_llm = ['inclusion_criteria', 'exclusion_criteria']
 
 # Parameters for running simulations
-n_simulations = 50
+n_simulations = 2
 stop_at_n = 100 # set to -1 to stop when all relevant records are found
 
 # Parameters for simulation (IVs)
-n_abstracts = 1
-length_abstracts = 500
-typicality = .90
-degree_jargon = .10
-llm_temperature = .7
+n_abstracts = [1, 2, 3]
+length_abstracts = [200, 500, 1000]
+typicality = [0.90]
+degree_jargon = [0.10]
+llm_temperature = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
 
 # Parameters for evaluation (DVs)
 tdd_threshold = 100
@@ -81,23 +82,40 @@ def run(
 
     ### SIMULATE AND EVALUATE #################################################################################
     
-    for sim in range(n_simulations):
-        run_simulation(
-            datasets=datasets,
-            criterium=stimulus_for_llm,
-            out_dir=out_dir,
-            metadata=synergy_metadata,
-            n_abstracts=n_abstracts,
-            length_abstracts=length_abstracts,
-            typicality=typicality,
-            degree_jargon=degree_jargon,
-            llm_temperature=llm_temperature,
-            tdd_threshold=tdd_threshold,
-            wss_threshold=wss_threshold,
-            seed=seed,
-            run=sim + 1,  # 1-based replicate index
-            stop_at_n=stop_at_n
-        )
+    # Generate all combinations of IVs
+    iv_combinations = list(itertools.product(
+        n_abstracts,
+        length_abstracts,
+        typicality,
+        degree_jargon,
+        llm_temperature
+    ))
+    
+    print(f"Running {n_simulations} simulations for each of {len(iv_combinations)} IV combinations")
+    print(f"Total simulations: {n_simulations * len(iv_combinations)}")
+    
+    for combo_idx, (n_abs, len_abs, typ, jargon, temp) in enumerate(iv_combinations, 1):
+        print(f"\nIV Combination {combo_idx}/{len(iv_combinations)}: "
+              f"n_abstracts={n_abs}, length={len_abs}, typicality={typ}, "
+              f"jargon={jargon}, temperature={temp}")
+        
+        for sim in range(n_simulations):
+            run_simulation(
+                datasets=datasets,
+                criterium=stimulus_for_llm,
+                out_dir=out_dir,
+                metadata=synergy_metadata,
+                n_abstracts=n_abs,
+                length_abstracts=len_abs,
+                typicality=typ,
+                degree_jargon=jargon,
+                llm_temperature=temp,
+                tdd_threshold=tdd_threshold,
+                wss_threshold=wss_threshold,
+                seed=seed,
+                run=sim + 1,  # 1-based replicate index
+                stop_at_n=stop_at_n
+            )
 
     ############################################################################################################
 

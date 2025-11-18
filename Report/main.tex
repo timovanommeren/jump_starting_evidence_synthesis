@@ -117,7 +117,7 @@ Between simulation runs the exact number of abstracts generated as well as their
 
 More specifically, the LLM was provided with either: (a) the title of the published systematic review, (b) the inclusion and exclusion criteria of the systematic review, or (c) the abstract of the published systematic review. Number of abstracts was varied between 1-2-5-10 abstracts per run. The length was varied between 100-200-500-1000 words per run. Whether the abstract should be a typical example of a paper in this review or rather an edge case was varied if 5 or 10 abstracts were generated. In this case the ratio between typical and atypical examples was varied between 00-20-40-60-80-100 \% typical. Finally, the use of jargon was varied similarly to typicality by generating abstracts which were simply pure lists of jargon and combining these with regularly written abstract in  the ratio 00-20-40-60-80-100 given that at least 5 or 10 abstracts were generated. 
 
-To instruct the LLM, a DSPY module was created which takes the variables described above as input, as well as whether the abstract should be relevant or irrelevant. Note that to generate multiple abstracts per run, the module was simply looped over and called multiple times. For the exact code, see: \href{https://github.com/timovanommeren/thesis_timo/blob/main/simulations/prompting.py}{here}
+To instruct the LLM, a DSPY module was created which takes the variables described above as input, as well as whether the abstract should be relevant or irrelevant \parencite{khattab2023dspy}. Note that to generate multiple abstracts per run, the module was simply looped over and called multiple times. For the exact code, see: \href{https://github.com/timovanommeren/thesis_timo/blob/main/simulations/prompting.py}{here}
 
 \subsubsection{Random initialization}
 
@@ -145,14 +145,26 @@ A common way of visualizing the simulation results of retrieval tasks in general
 
 \subsubsection{Exported results}
 
-At the end of each simulation run, a seperate row for each metric is appended to a csv containing: 
+Each simulation run is stored in a separate CSV file. Every row represents a screened paper and contains the following information:
 
-\begin{enumerate}
-    \item the name of the metric
-    \item the value of the metric
+\begin{enumerate}[label=\arabic*), leftmargin=*, nosep]
+  \item The paper's record ID,
+  \item The assigned label (i.e., relevant or irrelevant),
+  \item The classifier, querier, balancer and feature extractor used,
+  \item The size of the training set,
+  \item A time tag.
+\end{enumerate} 
+
+Furthermore, the following naming convention is used for the CSV files: \newline condition\_run\_run\_IVs\_n\_abstracts\_length\_abstracts\_typicality\_degree\_jargon\_llm\_temperature.csv. The same naming convention is used for the recall plots of each simulation run and for the generated abstracts in the LLM initialisation condition.
+
+Finally, at the end of each run, the current values of the input parameters, the outcome variables and other relevant metadata are appended to a long format master dataframe for analysis. The columns of this dataframe are as follows:
+
+\begin{enumerate}[label=\arabic*), leftmargin=*, nosep]
+    \item the name of the outcome variable
+    \item the value of the outcome variable
     \item name of the simulated dataset,
     \item the condition,
-    \item the independent variables:
+    \item the values of the independent variables:
         \begin{enumerate}
         \item number of abstracts
         \item length of the abstracts
@@ -165,11 +177,20 @@ At the end of each simulation run, a seperate row for each metric is appended to
     \item the run number
 \end{enumerate}
 
-This yields a data-frame containing one observation for each combination of dataset (n=26), condition (n=3) and run (n=50), thus with $26 \times 3 \times 50 = 3900$ rows, and the 12 columns enumerated above. The resulting dataframe was analysed in \textit{Rstudio version ???}. 
+This yields a data-frame containing one observation for each combination of dataset (n=26), condition (n=3), independent variables and their levels (n=$3 \times 4 \times 4 \times 5 \times 5 = 1200$), and run (n=1), thus with $26 \times 3 \times 1200 \times 1 = 93600$ rows, and the 12 columns enumerated above. 
 
-\subsection{Analysis}
 
-The majority of the variance in the number of relevant records found in the first 100 screened is expected to be explained by differences between datasets. We would therefore like to seperate within-dataset variance from between-dataset variance. Ideal for this purpose are  linear mixed-effects models (LMEMs) which allow us to model the effect of condition on starting performance while accounting for between-dataset variance by including dataset as a random effect. To confirm that most of the variance is indeed between datasets, we will visualize the data using boxplots and fit a null model with only dataset as a random effect to calculate the intraclass correlation coefficient (ICC). Multilevel analysis will be conducted in R using the \textit{lme4} package  \parencite{bates2015fitting}. %(version 1.1.36)
+\subsubsection{Analysis}
+
+The majority of the variance in the number of relevant records found in the first 100 screened is expected to be explained by differences between datasets. We would therefore like to seperate within-dataset variance from between-dataset variance. Ideal for this purpose are  linear mixed-effects models (LMEMs) which allow us to model the effect of condition on starting performance while accounting for between-dataset variance by including dataset as a random effect. To confirm that most of the variance is indeed between datasets, we will visualize the data using boxplots and fit a null model with only dataset as a random effect to calculate the intraclass correlation coefficient (ICC). A bottom-up modelling approach will then be used for multilevel analysis (for approach see chapter 4 of the book by \cite{hox2017multilevel}) and will be conducted in R using the \textit{lme4} package  \parencite{bates2015fitting}. %(version 1.1.36)
+
+\vspace{0.5cm}
+
+Question: how to validate exploratory bottom-up approach to modelling. The book mentions either cross-validation or Benferroni correction.
+
+% then be used to investigate the effect of condition on starting performance. First, a model with only condition as a fixed effect and dataset as a random effect will be fitted. Next, the independent variables in the LLM initialisation condition will be added as fixed effects to investigate whether they explain additional variance in starting performance. Finally, interaction effects between these independent variables and condition will be investigated. Model fit will be assessed using likelihood ratio tests, AIC and BIC. Residuals will be checked for normality and homoscedasticity.
+
+
 
 \section{Results (note: preliminary!)}
 
@@ -185,10 +206,6 @@ As expected, most of the variance in starting performance seems to be explained 
 \end{figure}
 
 \subsection{Main results}
-
-(Note that the results below are preliminary using a simple linear model and do not reflect the final analysis. The final analysis will use linear mixed effects models to account for between-dataset variance)
-
-\vspace{0.5cm}
 
 \input{results/results_paragraph.tex}
 
@@ -207,48 +224,50 @@ As expected, most of the variance in starting performance seems to be explained 
 \end{figure}
 
 
-\begin{table}[!htbp] \centering 
-  \caption{Effect of initialization on the number relevant records found in first 100 screened} 
-  \label{} 
-\begin{tabular}{@{\extracolsep{5pt}}lcc} 
-\\[-1.8ex]\hline 
-\hline \\[-1.8ex] 
- & \multicolumn{2}{c}{\textit{Dependent variable:}} \\ 
-\cline{2-3} 
-\\[-1.8ex] & \multicolumn{2}{c}{Outcome: number of records found} \\ 
- & Effect across datasets &  \\ 
-\\[-1.8ex] & (1) & (2)\\ 
-\hline \\[-1.8ex] 
- Records &  & 0.001$^{***}$ \\ 
-  &  & (0.0001) \\ 
-  & & \\ 
- conditionminimal & $-$0.085 & 1.983$^{*}$ \\ 
-  & (1.017) & (1.148) \\ 
-  & & \\ 
- conditionno\_priors & $-$9.882$^{***}$ & $-$3.562$^{***}$ \\ 
-  & (1.017) & (1.148) \\ 
-  & & \\ 
- Records:conditionminimal &  & $-$0.0003$^{***}$ \\ 
-  &  & (0.0001) \\ 
-  & & \\ 
- Records:conditionno\_priors &  & $-$0.001$^{***}$ \\ 
-  &  & (0.0001) \\ 
-  & & \\ 
- Intercept & 30.114$^{***}$ & 25.290$^{***}$ \\ 
-  & (0.719) & (0.812) \\ 
-  & & \\ 
-\hline \\[-1.8ex] 
-Observations & 2,616 & 2,616 \\ 
-R$^{2}$ & 0.046 & 0.110 \\ 
-Adjusted R$^{2}$ & 0.045 & 0.108 \\ 
-Residual Std. Error & 21.246 (df = 2613) & 20.530 (df = 2610) \\ 
-F Statistic & 62.346$^{***}$ (df = 2; 2613) & 64.384$^{***}$ (df = 5; 2610) \\ 
-\hline 
-\hline \\[-1.8ex] 
-\textit{Note:}  & \multicolumn{2}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
-\end{tabular} 
-\label{tab:results}
-\end{table} 
+\input{results/results_table.tex}
+
+% \begin{table}[!htbp] \centering 
+%   \caption{Effect of initialization on the number relevant records found in first 100 screened} 
+%   \label{} 
+% \begin{tabular}{@{\extracolsep{5pt}}lcc} 
+% \\[-1.8ex]\hline 
+% \hline \\[-1.8ex] 
+%  & \multicolumn{2}{c}{\textit{Dependent variable:}} \\ 
+% \cline{2-3} 
+% \\[-1.8ex] & \multicolumn{2}{c}{Outcome: number of records found} \\ 
+%  & Effect across datasets &  \\ 
+% \\[-1.8ex] & (1) & (2)\\ 
+% \hline \\[-1.8ex] 
+%  Records &  & 0.001$^{***}$ \\ 
+%   &  & (0.0001) \\ 
+%   & & \\ 
+%  conditionminimal & $-$0.085 & 1.983$^{*}$ \\ 
+%   & (1.017) & (1.148) \\ 
+%   & & \\ 
+%  conditionno\_priors & $-$9.882$^{***}$ & $-$3.562$^{***}$ \\ 
+%   & (1.017) & (1.148) \\ 
+%   & & \\ 
+%  Records:conditionminimal &  & $-$0.0003$^{***}$ \\ 
+%   &  & (0.0001) \\ 
+%   & & \\ 
+%  Records:conditionno\_priors &  & $-$0.001$^{***}$ \\ 
+%   &  & (0.0001) \\ 
+%   & & \\ 
+%  Intercept & 30.114$^{***}$ & 25.290$^{***}$ \\ 
+%   & (0.719) & (0.812) \\ 
+%   & & \\ 
+% \hline \\[-1.8ex] 
+% Observations & 2,616 & 2,616 \\ 
+% R$^{2}$ & 0.046 & 0.110 \\ 
+% Adjusted R$^{2}$ & 0.045 & 0.108 \\ 
+% Residual Std. Error & 21.246 (df = 2613) & 20.530 (df = 2610) \\ 
+% F Statistic & 62.346$^{***}$ (df = 2; 2613) & 64.384$^{***}$ (df = 5; 2610) \\ 
+% \hline 
+% \hline \\[-1.8ex] 
+% \textit{Note:}  & \multicolumn{2}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+% \end{tabular} 
+% \label{tab:results}
+% \end{table} 
 
 
 \section{Conclusion} 
@@ -281,7 +300,7 @@ F Statistic & 62.346$^{***}$ (df = 2; 2613) & 64.384$^{***}$ (df = 5; 2610) \\
 \end{enumerate}
 
 
-
+%TC:ignore
 \appendix
 
 \section{SYNERGY metadata}
@@ -326,5 +345,6 @@ F Statistic & 62.346$^{***}$ (df = 2; 2613) & 64.384$^{***}$ (df = 5; 2610) \\
 
 % References
 \printbibliography
+%TC:endignore
 
 \end{document}

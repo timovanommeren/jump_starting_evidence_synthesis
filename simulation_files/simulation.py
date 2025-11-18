@@ -91,7 +91,7 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
         
         #save all results to csv files
         for sim, condition in zip([simulate_minimal, simulate_llm, simulate_no_priors], ['minimal', 'llm', 'no_priors']):
-            sim._results.to_csv(raw_sim_dir / f'{condition}_run_{run}.csv', index=False)
+            sim._results.to_csv(raw_sim_dir / f'{condition}_run_{run}_IVs_{n_abstracts}_{length_abstracts}_{typicality}_{degree_jargon}_{llm_temperature}.csv', index=False)
         
         # This line drops priors. To access the dataframe before this, just use simulate._results
         df_results_minimal = simulate_minimal._results.dropna(axis=0, subset="training_set")
