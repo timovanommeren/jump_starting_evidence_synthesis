@@ -4,7 +4,7 @@ This repository contains the code to reproduce the results of *Jump Starting Evi
 
 ## Set up
 
-To be able to replicate the results of the simulation study, please follow the instructions below
+To be able to replicate the results of the simulation study, please follow the instructions below.
 
 ### Install python packages
 
@@ -31,4 +31,21 @@ cp env.example .env
 ```
 
 ### Run the simulation study
+
+First downloaded the datasets from: [the SYNERGY repository](https://github.com/asreview/synergy-dataset) (we of course encourage replications using other datasets). 
+
+(What about meta-data? -- I now have a local fiel from Emily. Will this be published?)
+
+A prepared .bat file? -- but for now:
+```
+python simulation_files\run.py run 'path to synergy datasets' simulation_results\results 'inclusion_criteria exclusion_criteria'
+```
+
+
+### Render the report
+
+Knit the main.tex file:
+```
+latexmk -pdf -shell-escape main.tex
+```
 
