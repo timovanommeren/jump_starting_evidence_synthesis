@@ -209,12 +209,6 @@ As expected, most of the variance in starting performance seems to be explained 
 
 \input{results/results_paragraph.tex}
 
-% The main purpose of this simulation study was to investigate the effect on starting performance of LLM initialization, versus random initialization or no initialization. 
-
-% A linear regression was used to analyse the effect of the three conditions on the number of relevant records found within the first hundred screenings. We find that by using LLM-generated abstracts to initialize the ALM, an average of \num{\LLMest}{\pstars{\LLMp}} (\num{\LLMse}) relevant papers are found. Interestingly, this is approximately equal to when random initialization was used at an average relevant papers found of \num{\LLMest} + \num{\Randest}{\pstars{\Randp}} (\num{\Randse}) = ??? . Indeed, this difference is statistically insignificant. In contrast, the difference between initialization using LLM-generated abstracts and no initialization was significant at \num{\LLMest} + \num{\Nop}{\pstars{\Nop}} (\num{\Nose}) = ??? relevant papers found on average. For the full results see table \ref{tab:results}.
-
-
-
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.45\textwidth]{aggregate_recall_plot_walker.png}
@@ -225,50 +219,6 @@ As expected, most of the variance in starting performance seems to be explained 
 
 
 \input{results/results_table.tex}
-
-% \begin{table}[!htbp] \centering 
-%   \caption{Effect of initialization on the number relevant records found in first 100 screened} 
-%   \label{} 
-% \begin{tabular}{@{\extracolsep{5pt}}lcc} 
-% \\[-1.8ex]\hline 
-% \hline \\[-1.8ex] 
-%  & \multicolumn{2}{c}{\textit{Dependent variable:}} \\ 
-% \cline{2-3} 
-% \\[-1.8ex] & \multicolumn{2}{c}{Outcome: number of records found} \\ 
-%  & Effect across datasets &  \\ 
-% \\[-1.8ex] & (1) & (2)\\ 
-% \hline \\[-1.8ex] 
-%  Records &  & 0.001$^{***}$ \\ 
-%   &  & (0.0001) \\ 
-%   & & \\ 
-%  conditionminimal & $-$0.085 & 1.983$^{*}$ \\ 
-%   & (1.017) & (1.148) \\ 
-%   & & \\ 
-%  conditionno\_priors & $-$9.882$^{***}$ & $-$3.562$^{***}$ \\ 
-%   & (1.017) & (1.148) \\ 
-%   & & \\ 
-%  Records:conditionminimal &  & $-$0.0003$^{***}$ \\ 
-%   &  & (0.0001) \\ 
-%   & & \\ 
-%  Records:conditionno\_priors &  & $-$0.001$^{***}$ \\ 
-%   &  & (0.0001) \\ 
-%   & & \\ 
-%  Intercept & 30.114$^{***}$ & 25.290$^{***}$ \\ 
-%   & (0.719) & (0.812) \\ 
-%   & & \\ 
-% \hline \\[-1.8ex] 
-% Observations & 2,616 & 2,616 \\ 
-% R$^{2}$ & 0.046 & 0.110 \\ 
-% Adjusted R$^{2}$ & 0.045 & 0.108 \\ 
-% Residual Std. Error & 21.246 (df = 2613) & 20.530 (df = 2610) \\ 
-% F Statistic & 62.346$^{***}$ (df = 2; 2613) & 64.384$^{***}$ (df = 5; 2610) \\ 
-% \hline 
-% \hline \\[-1.8ex] 
-% \textit{Note:}  & \multicolumn{2}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
-% \end{tabular} 
-% \label{tab:results}
-% \end{table} 
-
 
 \section{Conclusion} 
 

@@ -1,6 +1,8 @@
 
+% Table created by stargazer v.5.2.3 by Marek Hlavac, Social Policy Institute. E-mail: marek.hlavac at gmail.com
+% Date and time: Wed, Nov 19, 2025 - 21:35:44
 \begin{table}[!htbp] \centering 
-  \caption{Effect of initialization on the number relevant records found in first 100 screened} 
+  \caption{Effect of initialisation on the number relevant records found in first 100 screened} 
   \label{} 
 \begin{tabular}{@{\extracolsep{5pt}}lccccc} 
 \\[-1.8ex]\hline 
@@ -8,46 +10,56 @@
  & \multicolumn{5}{c}{\textit{Dependent variable:}} \\ 
 \cline{2-6} 
 \\[-1.8ex] & \multicolumn{5}{c}{Outcome: number of records found} \\ 
- &  &  &  &  &  \\ 
 \\[-1.8ex] & (1) & (2) & (3) & (4) & (5)\\ 
 \hline \\[-1.8ex] 
- conditionminimal &  & $-$0.766$^{**}$ & $-$0.766$^{**}$ & $-$0.766 & $-$1.562$^{*}$ \\ 
-  &  & (0.377) & (0.377) & (0.768) & (0.943) \\ 
+ \multirow{2}{*}{\shortstack[l]{Random\\initialisation}} & $-$0.766 & $-$0.766 & $-$0.766 & $-$0.766 & $-$0.766 \\ 
+  & (0.377) & (0.377) & (0.377) & (0.768) & (0.742) \\ 
   & & & & & \\ 
- conditionno\_priors &  & $-$14.420$^{***}$ & $-$14.420$^{***}$ & $-$14.420$^{***}$ & $-$19.421$^{***}$ \\ 
-  &  & (0.377) & (0.377) & (4.123) & (4.997) \\ 
+ \multirow{2}{*}{\shortstack[l]{No\\initialisation}} & $-$14.420 & $-$14.420 & $-$14.420 & $-$14.420 & $-$14.420 \\ 
+  & (0.377) & (0.377) & (0.377) & (4.123) & (3.929) \\ 
   & & & & & \\ 
- n\_abstracts &  & 0.079 & 0.079 & 0.079$^{*}$ & 0.079$^{*}$ \\ 
+ \multirow{2}{*}{\shortstack[l]{Number of \\ abstracts}} &  & 0.079 & 0.079 & 0.079 & 0.079 \\ 
   &  & (0.188) & (0.188) & (0.040) & (0.040) \\ 
   & & & & & \\ 
- length\_abstracts &  & $-$0.00004 & $-$0.00004 & $-$0.00004 & $-$0.00004 \\ 
+ \multirow{2}{*}{\shortstack[l]{Length \\ abstracts}} &  & $-$0.00004 & $-$0.00004 & $-$0.00004 & $-$0.00004 \\ 
   &  & (0.0005) & (0.0005) & (0.0001) & (0.0001) \\ 
   & & & & & \\ 
- llm\_temperature &  & 0.121 & 0.121 & 0.121 & 0.121 \\ 
+ \multirow{2}{*}{\shortstack[l]{LLM \\ temperature.}} &  & 0.121 & 0.121 & 0.121 & 0.121 \\ 
   &  & (0.451) & (0.451) & (0.097) & (0.097) \\ 
   & & & & & \\ 
- Records &  &  & 0.001$^{**}$ & 0.0002 & 0.0002 \\ 
-  &  &  & (0.0002) & (0.0002) & (0.0002) \\ 
+ \multirow{2}{*}{\shortstack[l]{Dataset size \\ (N records)}} &  &  & 6.400 & 1.927 & 1.927 \\ 
+  &  &  & (2.570) & (2.326) & (2.326) \\ 
   & & & & & \\ 
- pct &  &  & 2.294$^{***}$ & 2.413$^{***}$ & 1.616$^{**}$ \\ 
+ \multirow{2}{*}{\shortstack[l]{\% relevant records}} &  &  & 2.294 & 2.413 & 1.616 \\ 
   &  &  & (0.468) & (0.423) & (0.651) \\ 
   & & & & & \\ 
- conditionminimal:pct &  &  &  &  & 0.184 \\ 
+ \multirow{2}{*}{\shortstack[l]{\% x Random \\ initialisation}} &  &  &  &  & 0.184 \\ 
   &  &  &  &  & (0.135) \\ 
   & & & & & \\ 
- conditionno\_priors:pct &  &  &  &  & 1.159 \\ 
-  &  &  &  &  & (0.715) \\ 
+ \multirow{2}{*}{\shortstack[l]{\% x No initialisation}} &  &  &  &  & 1.159 \\ 
+  &  &  &  &  & (0.716) \\ 
   & & & & & \\ 
- Constant & 25.820$^{***}$ & 30.685$^{***}$ & 17.006$^{***}$ & 19.132$^{***}$ & 22.573$^{***}$ \\ 
-  & (3.464) & (3.509) & (3.808) & (4.442) & (4.851) \\ 
+ Constant & 30.882 & 30.882 & 30.882 & 30.882 & 30.882 \\ 
+  & (3.471) & (3.471) & (2.475) & (3.615) & (3.512) \\ 
   & & & & & \\ 
 \hline \\[-1.8ex] 
-Observations & 4,212 & 4,212 & 4,212 & 4,212 & 4,212 \\ 
-Log Likelihood & $-$16,517.940 & $-$15,750.780 & $-$15,741.930 & $-$9,460.322 & $-$9,458.725 \\ 
-Akaike Inf. Crit. & 33,041.880 & 31,517.560 & 31,503.870 & 18,950.640 & 18,951.450 \\ 
-Bayesian Inf. Crit. & 33,060.920 & 31,568.330 & 31,567.320 & 19,045.830 & 19,059.330 \\ 
+$\mathrm{Var}(u_{0j})$ & 311.447 & 311.447 & 157.375 & 339.764 & 320.599 \\ 
+$\mathrm{Var}(u_{1j})$ &  &  &  & 15.158 & 14.133 \\ 
+$\mathrm{Var}(u_{2j})$ &  &  &  & 441.751 & 401.266 \\ 
+$\mathrm{Var}(\varepsilon_{ij})$ & 99.757 & 99.751 & 99.751 & 4.596 & 4.596 \\ 
+$\rho(u_{0j}, u_{1j})$ &  &  &  & -0.297 & -0.251 \\ 
+$\rho(u_{0j}, u_{2j})$ &  &  &  & -0.787 & -0.772 \\ 
+$\rho(u_{1j}, u_{2j})$ &  &  &  & 0.383 & 0.331 \\ 
+$\Delta$ deviance (df) &  & 0.25 (3) & 17.7 (2)*** & 12563.22 (5)*** & 3.19 (2) \\ 
+Log Likelihood & $-$15,750.910 & $-$15,750.780 & $-$15,741.930 & $-$9,460.322 & $-$9,458.725 \\ 
+Akaike Inf. Crit. & 31,511.820 & 31,517.560 & 31,503.870 & 18,950.640 & 18,951.450 \\ 
 \hline 
 \hline \\[-1.8ex] 
-\textit{Note:}  & \multicolumn{5}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\multicolumn{6}{l}{Model 1: only initialization conditions.} \\ 
+\multicolumn{6}{l}{Model 2: adds within-dataset covariates.} \\ 
+\multicolumn{6}{l}{Model 3: adds between-dataset covariates.} \\ 
+\multicolumn{6}{l}{Model 4: adds random effects for initialization.} \\ 
+\multicolumn{6}{l}{Model 5: adds interaction terms.} \\ 
+\multicolumn{6}{l}{$^{*} p<0.1; ^{**} p<0.05; ^{***} p<0.01$} \\ 
 \end{tabular} 
 \end{table} 
