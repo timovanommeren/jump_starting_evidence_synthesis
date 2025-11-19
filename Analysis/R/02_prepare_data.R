@@ -14,11 +14,13 @@ prepare_data <- function(simulation_long, metadata) {
   
   #change column name metadata_datasets from Dataset to dataset to match data
   colnames(meta)[colnames(meta) == 'Dataset'] <- 'dataset'
+  colnames(meta)[colnames(meta) == 'pct'] <- 'percent_rel'
+  colnames(meta)[colnames(meta) == 'Records'] <- 'records'
   
   
-  # add ''Records' and 'pct' to data from metadata based on column id 'dataset'
+  # add 'records' and 'percent_rel' to data from metadata based on column id 'dataset'
   data <- data %>%
-    left_join(meta %>% select(dataset, Records, pct, Topics), by = "dataset")
+    left_join(meta %>% select(dataset, records, percent_rel, Topics), by = "dataset")
   
   # return as list
   list(

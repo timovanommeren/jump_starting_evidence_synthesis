@@ -38,12 +38,12 @@ descriptive_barchart <- function(data, metadata) {
     ) %>% 
     tidyr::replace_na(list(td_se = 0)) 
   
-  # if only 1 obs, sd = NA → set SE to 0 # Join % to your plot_data and set the x-order by pct (descending = highest % first) 
+  # if only 1 obs, sd = NA → set SE to 0 # Join % to your plot_data and set the x-order by percent_rel (descending = highest % first) 
   plot_data <- plot_data %>% 
-    left_join(metadata %>% select(dataset, pct), by = c("dataset" = "dataset")) %>% 
+    left_join(metadata %>% select(dataset, percent_rel), by = c("dataset" = "dataset")) %>% 
     mutate(dataset = fct_reorder( 
-      paste0(dataset, " (", pct, "%)"), 
-      pct, .desc = TRUE))
+      paste0(dataset, " (", percent_rel, "%)"), 
+      percent_rel, .desc = TRUE))
   
   plot <- ggplot(
     plot_data,
@@ -60,7 +60,7 @@ descriptive_barchart <- function(data, metadata) {
                linewidth = 0.4) +
     labs(
       title = "",
-      x = "Datasets <span style='color:#888888;'>(ordered by percentage of relevant records)</span>", 
+      x = "Datasets <span style='color:#888888;'>(ordered by percent_rel of relevant records)</span>", 
       y = "Number of relevant records",
       fill = "Examples given before screening:"             
     ) +
@@ -99,3 +99,98 @@ descriptive_barchart <- function(data, metadata) {
   return(plot)
 
 }
+
+
+
+
+plots_llm_vs_no_init_conditions <- function(simulation, dataset_name) {
+  
+  library(ggdist)
+  
+  diff <- simulation %>% 
+    filter(dataset == dataset_name) %>% 
+    select(run, condition, td) %>%
+    mutate(diff_llm_no = llm - no_priors)
+  
+  
+  ggplot(diff, aes(x = diff_llm_no)) +
+    geom_histogram(aes(y = ..density..), bins = 10, alpha = 0.6) +
+    geom_density(linewidth = 0.8) +
+    labs(
+      x = "td_llm − td_no_priors (per run)",
+      y = "Density",
+      title = paste("Distribution of td difference (LLM vs no priors) – ", dataset_name)
+    )
+  
+  ggplot(diff, aes(x = diff_llm_no)) +
+    stat_ecdf(linewidth = 0.8) +
+    labs(
+      x = "td_llm − td_no_priors",
+      y = "Empirical CDF",
+      title = paste("ECDF of td difference – ", dataset_name)
+    )
+  
+  ggplot(diff, aes(x = "", y = diff_llm_no)) +
+    geom_boxplot(width = 0.2, outlier.shape = NA) +
+    geom_jitter(width = 0.05, height = 0, alpha = 0.6) +
+    labs(
+      x = NULL,
+      y = "td_llm − td_no_priors",
+      title = paste("Run-wise differences in td – ", dataset_name)
+    ) +
+    theme(axis.text.x = element_blank())
+  
+  ggplot(diff, aes(x = "", y = diff_llm_no)) +
+    geom_violin(trim = FALSE, alpha = 0.6) +
+    geom_jitter(width = 0.05, height = 0, alpha = 0.6) +
+    labs(x = NULL, y = "td_llm − td_no_priors")
+  
+  
+  ggplot(diff, aes(sample = diff_llm_no)) +
+    stat_qq() +
+    stat_qq_line() +
+    labs(
+      title = paste("QQ plot of td difference – ", dataset_name),
+      x = "Theoretical quantiles",
+      y = "Sample quantiles"
+    )
+  
+  ggplot(diff, aes(x = diff_llm_no, y = 1)) +
+    stat_halfeye(point_interval = median_qi) +
+    labs(
+      x = "td_llm − td_no_priors",
+      y = NULL,
+      title = paste("Sampling distribution of td difference – ", dataset_name)
+    ) +
+    theme(axis.text.y = element_blank())
+  
+  
+}
+
+
+
+# ggplot(
+#   subset(simulation, !dataset %in% c("Walker_2018", "Brouwer_2019")),
+#   aes(x = records, y = td)) +
+#   geom_point(alpha = 0.6) +
+#   geom_smooth(method = "lm",
+#               aes(color = "linear"),
+#               se = FALSE) +
+#   geom_smooth(method = "lm",
+#               formula = y ~ x + I(x^2),
+#               aes(color = "quadratic"),
+#               se = FALSE) +
+#   labs(
+#     title = "Scatter plot of records vs. Number of relevant records found",
+#     x = "Number of records",
+#     y = "Number of relevant records found in first 100 screened"
+#   ) +
+#   theme_minimal() +
+#   theme(
+#     plot.title = element_text(hjust = 0.5, face = "bold"),
+#     panel.background = element_rect(fill = "white", color = NA),
+#     plot.background  = element_rect(fill = "white", color = NA),
+#     legend.background = element_rect(fill = "white", color = NA),
+#     legend.key = element_rect(fill = "white", color = NA),
+#     plot.margin = margin(10, 20, 10, 10)
+#   )

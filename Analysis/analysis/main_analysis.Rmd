@@ -26,7 +26,7 @@ raw <- load_simulation_data()
 
 # (1) transform simulation data to wide
 # (2) adjust metadata column names, and, 
-# (3) add the number of records and percentage of relevant records from metadata to simulation data (these will serve as group-level predictors in multilevel model)
+# (3) add the number of records and percent_rel of relevant records from metadata to simulation data (these will serve as group-level predictors in multilevel model)
 processed <- prepare_data(raw$simulation, raw$meta)
 
 # assign to variables for easier access
@@ -60,87 +60,23 @@ descriptive_barchart(simulation, metadata)
 ```
 
 
-```{r, eval=FALSE}
-#create data with only walker
+## Data Analysis
 
-walker_diff <- simulation_long %>% 
-  filter(dataset == "Leenaars_2020", metric == "td") %>% 
-  select(run, condition, value) %>% 
-  pivot_wider(
-    names_from  = condition,
-    values_from = value
-  ) %>% 
-  mutate(diff_llm_no = llm - no_priors)
+### Checking assumptions
 
 
-ggplot(walker_diff, aes(x = diff_llm_no)) +
-  geom_histogram(aes(y = ..density..), bins = 10, alpha = 0.6) +
-  geom_density(linewidth = 0.8) +
-  labs(
-    x = "td_llm − td_no_priors (per run)",
-    y = "Density",
-    title = "Distribution of td difference (LLM vs no priors) – Walker_2018"
-  )
-
-ggplot(walker_diff, aes(x = diff_llm_no)) +
-  stat_ecdf(linewidth = 0.8) +
-  labs(
-    x = "td_llm − td_no_priors",
-    y = "Empirical CDF",
-    title = "ECDF of td difference – Walker_2018"
-  )
-
-ggplot(walker_diff, aes(x = "", y = diff_llm_no)) +
-  geom_boxplot(width = 0.2, outlier.shape = NA) +
-  geom_jitter(width = 0.05, height = 0, alpha = 0.6) +
-  labs(
-    x = NULL,
-    y = "td_llm − td_no_priors",
-    title = "Run-wise differences in td – Walker_2018"
-  ) +
-  theme(axis.text.x = element_blank())
-
-ggplot(walker_diff, aes(x = "", y = diff_llm_no)) +
-  geom_violin(trim = FALSE, alpha = 0.6) +
-  geom_jitter(width = 0.05, height = 0, alpha = 0.6) +
-  labs(x = NULL, y = "td_llm − td_no_priors")
-
-
-ggplot(walker_diff, aes(sample = diff_llm_no)) +
-  stat_qq() +
-  stat_qq_line() +
-  labs(
-    title = "QQ plot of td difference – Walker_2018",
-    x = "Theoretical quantiles",
-    y = "Sample quantiles"
-  )
-
-
-library(ggdist)
-
-ggplot(walker_diff, aes(x = diff_llm_no, y = 1)) +
-  stat_halfeye(point_interval = median_qi) +
-  labs(
-    x = "td_llm − td_no_priors",
-    y = NULL,
-    title = "Sampling distribution of td difference – Walker_2018"
-  ) +
-  theme(axis.text.y = element_blank())
-
-
+```{r}
+#check the assumption of homogeneity of variance across conditions
+ggplot(simulation, aes(x = condition, y = td)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.1, alpha = .3)
 ```
 
 
-
-## Data Analysis
-
-### Checking for outliers and linearity
-
-```{r}
-
-ggplot(
-        subset(simulation, !dataset %in% c("Walker_2018", "Brouwer_2019")),
-      aes(x = Records, y = td)) +
+```{r, run=FALSE}}
+# check the assumption of linearity between percentage and relevant records found
+ggplot(simulation,
+       aes(x = percent_rel, y = td)) +
   geom_point(alpha = 0.6) +
   geom_smooth(method = "lm",
               aes(color = "linear"),
@@ -150,8 +86,8 @@ ggplot(
               aes(color = "quadratic"),
               se = FALSE) +
   labs(
-    title = "Scatter plot of Records vs. Number of relevant records found",
-    x = "Number of Records",
+    title = "Percentage of relevant records vs. number of relevant records found",
+    x = "percentage of relevant records",
     y = "Number of relevant records found in first 100 screened"
   ) +
   theme_minimal() +
@@ -164,21 +100,9 @@ ggplot(
     plot.margin = margin(10, 20, 10, 10)
   )
 
-```
-
-
-```{r}
-#check the assumption of homogeneity of variance across conditions
-ggplot(simulation, aes(x = condition, y = td)) +
-  geom_boxplot() +
-  geom_jitter(width = 0.1, alpha = .3)
-```
-
-
-```{r, run=FALSE}}
-# check the assumption of linearity between pct and td
-ggplot(subset(simulation, !dataset %in% c("Walker_2018", "Brouwer_2019")),
-       aes(x = pct, y = td)) +
+# check the assumption of linearity between percentage and relevant records found
+ggplot(simulation,
+       aes(x = records, y = td)) +
   geom_point(alpha = 0.6) +
   geom_smooth(method = "lm",
               aes(color = "linear"),
@@ -188,7 +112,7 @@ ggplot(subset(simulation, !dataset %in% c("Walker_2018", "Brouwer_2019")),
               aes(color = "quadratic"),
               se = FALSE) +
   labs(
-    title = "Scatter plot of Percentage of relevant records vs. Number of relevant records found",
+    title = "Total number of records vs. number of relevant records found",
     x = "Percentage of relevant records",
     y = "Number of relevant records found in first 100 screened"
   ) +
@@ -222,22 +146,44 @@ simulation <- simulation %>% mutate(condition = relevel(factor(condition), ref =
 #### Intercept only model
 
 ```{r}
-model1 <- lmer(td ~ 1 + (1|dataset), REML = F, data = simulation)
-summary(model1)
+model0 <- lmer(td ~ 1 + (1|dataset), REML = F, data = simulation)
+summary(model0)
 ```
 
 ```{r}
-Intercept_variances = as.data.frame(VarCorr(model1))
+Intercept_variances = as.data.frame(VarCorr(model0))
 
 ICC = Intercept_variances[Intercept_variances$grp == 'dataset','vcov'] / (Intercept_variances[Intercept_variances$grp == 'dataset','vcov'] + Intercept_variances[Intercept_variances$grp == 'Residual','vcov'])
 
 print(ICC)
 ```
 
+```{r}
+
+model1 <- lmer(td ~ condition  + (1|dataset), REML = F, data = simulation)
+summary(model2)
+anova(model2, model1)
+```
 
 
 ```{r}
-#step forward with AIC?
+#grand mean centering of continuous predictors
+simulation <- simulation %>%
+  mutate(
+    n_abstracts       = n_abstracts - mean(n_abstracts),
+    length_abstracts  = length_abstracts - mean(length_abstracts),
+    llm_temperature   = llm_temperature - mean(llm_temperature),
+    records           = records - mean(records),
+    percent_rel               = percent_rel - mean(percent_rel)
+  )
+
+#scale 'records' variable
+simulation$records <- scale(simulation$records)
+
+```
+
+
+```{r}
 
 model2 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + (1|dataset), REML = F, data = simulation)
 summary(model2)
@@ -245,14 +191,16 @@ anova(model2, model1)
 ```
 
 
+15742    
+
 ```{r}
-model3 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + Records + pct + (1|dataset), REML = F, data = simulation)
+model3 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + records + percent_rel + (1|dataset), REML = F, data = simulation)
 summary(model3)
 anova(model3, model2)
 ```
 
 ```{r}
-model4 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + Records + pct + (condition|dataset), REML = F, data = simulation)
+model4 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + records + percent_rel + (condition|dataset), REML = F, data = simulation)
 summary(model4)
 anova(model4, model3)
 ```
@@ -260,7 +208,7 @@ anova(model4, model3)
 The negative correlations between the random intercepts and random slopes indicate that in datasets where performance under the reference condition (LLM) is higher than average, the drop in performance when using minimal or no_priors instead of LLM is larger than average. In other words, the effect of initialization was more pronounced for datasets where the overall performance was higher in general. Some datasets are simply easier for the active learning model of ASReview: many relevant records can be found early. In those ‘easier’ datasets, LLM-based initialization tends to create an especially large advantage over minimal or no_priors, which is reflected in the strong negative correlations between the random intercept and the random slopes.
 
 ```{r}
-model5 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + Records + pct + condition*pct + (condition|dataset), REML = F, data = simulation)
+model5 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + records + percent_rel + condition*percent_rel + (condition|dataset), REML = F, data = simulation)
 summary(model5)
 anova(model5, model4)
 ```
@@ -278,8 +226,6 @@ p_apa <- function(p) ifelse(is.na(p), "NA", ifelse(p < .001, "$p$ < .001", sprin
 options(scipen = 999)
 
 # limit to 2 decimal places
-
-
   
 # ---- Build LaTeX paragraph
 latex_text <- paste0(
@@ -317,17 +263,158 @@ writeLines(latex_text, "../Report/results/results_paragraph.tex")
 
 
 ```{r}
+subset(as.data.frame(VarCorr(model2)), grp == "dataset")$vcov
+subset(as.data.frame(VarCorr(model2)), grp == "Residual")$vcov
+```
+
+```{r}
+
+random_effects <- function(model){
+  
+  round_to = 3
+  
+  if (nrow(as.data.frame(VarCorr(model))) == 2) {
+    
+    return(
+      list(
+        residual_var = round(subset(as.data.frame(VarCorr(model)), grp == "Residual")$vcov, round_to),
+        intercept_var= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$vcov, round_to)
+        
+      )
+    )
+  }
+  else {
+    list(
+      residual_var = round(subset(as.data.frame(VarCorr(model)), grp == "Residual")$vcov, round_to),
+      intercept_var= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$vcov[1], round_to),
+      random_init_var= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$vcov[2], round_to),
+      no_init_var= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$vcov[3], round_to),
+      cor_random_init_intercept= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$sdcor[4], round_to),
+      cor_no_init_intercept= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$sdcor[5], round_to),
+      cor_no_init_random_init= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$sdcor[6], round_to)
+    )
+  }
+}
+
+random_effects(model4)
+
+```
+
+
+```{r}
+
+p_to_stars <- function(p) {
+  if (is.na(p)) return("")
+  if (p < 0.001) return("***")
+  if (p < 0.01)  return("**")
+  if (p < 0.05)  return("*")
+  ""
+}
+
 
 stargazer(
   model1, model2, model3, model4, model5,
+  # column.labels = c("Conds", "Within", "Between", "Rand effects", "Interactions"),
+  # column.separate = c(1, 1, 1, 1, 1),
   type = "latex",
-  title = "Effect of initialization on the number relevant records found in first 100 screened",
+  title = "Effect of initialisation on the number relevant records found in first 100 screened",
   dep.var.labels = "Outcome: number of records found",
-  column.labels = c(""),
-  header = FALSE,
-  digits = 3,
+  covariate.labels = c(
+     "\\multirow{2}{*}{\\shortstack[l]{Random\\\\initialisation}}",
+     "\\multirow{2}{*}{\\shortstack[l]{No\\\\initialisation}}",
+    "\\multirow{2}{*}{\\shortstack[l]{Number of \\\\ abstracts}}",
+    "\\multirow{2}{*}{\\shortstack[l]{Length \\\\ abstracts}}",
+    "\\multirow{2}{*}{\\shortstack[l]{LLM \\\\ temperature.}}",
+    "\\multirow{2}{*}{\\shortstack[l]{Dataset size \\\\ (N records)}}",
+    "\\multirow{2}{*}{\\shortstack[l]{\\% relevant records}}",
+    "\\multirow{2}{*}{\\shortstack[l]{\\% x Random \\\\ initialisation}}",
+    "\\multirow{2}{*}{\\shortstack[l]{\\% x No initialisation}}"
+  ),
+  add.lines = list(
+    
+    c("$\\mathrm{Var}(u_{0j})$",
+      random_effects(model1)$intercept_var, 
+      random_effects(model2)$intercept_var, 
+      random_effects(model3)$intercept_var, 
+      random_effects(model4)$intercept_var, 
+      random_effects(model5)$intercept_var
+      ),
+    
+    c("$\\mathrm{Var}(u_{1j})$",
+      "", 
+      "", 
+      "", 
+      random_effects(model4)$random_init_var, 
+      random_effects(model5)$random_init_var
+      ),
+    
+    c("$\\mathrm{Var}(u_{2j})$",
+      "",
+      "",
+      "",
+      random_effects(model4)$no_init_var,
+      random_effects(model5)$no_init_var
+      ),
+    
+        c("$\\mathrm{Var}(\\varepsilon_{ij})$",
+      random_effects(model1)$residual_var, 
+      random_effects(model2)$residual_var, 
+      random_effects(model3)$residual_var, 
+      random_effects(model4)$residual_var, 
+      random_effects(model5)$residual_var
+      ),
+    
+    c("$\\rho(u_{0j}, u_{1j})$",
+      "",
+      "",
+      "",
+      random_effects(model4)$cor_random_init_intercept,
+      random_effects(model5)$cor_random_init_intercept
+      ),
+    c("$\\rho(u_{0j}, u_{2j})$",
+      "",
+      "",
+      "",
+      random_effects(model4)$cor_no_init_intercept,
+      random_effects(model5)$cor_no_init_intercept
+      ),
+    c("$\\rho(u_{1j}, u_{2j})$",
+      "",
+      "",
+      "",
+      random_effects(model4)$cor_no_init_random_init,
+      random_effects(model5)$cor_no_init_random_init
+      ),
+    c("$\\Delta$ deviance (df)",
+      "",
+      paste0(round(anova(model1, model2)$Chisq[2],2), " (", anova(model1, model2)$Df[2], ")", p_to_stars(anova(model1, model2)$'Pr(>Chisq)'[2])),
+      paste0(round(anova(model2, model3)$Chisq[2],2), " (", anova(model2, model3)$Df[2], ")", p_to_stars(anova(model2, model3)$'Pr(>Chisq)'[2])),
+      paste0(round(anova(model3, model4)$Chisq[2],2), " (", anova(model3, model4)$Df[2], ")", p_to_stars(anova(model3, model4)$'Pr(>Chisq)'[2])),
+      paste0(round(anova(model4, model5)$Chisq[2],2), " (", anova(model4, model5)$Df[2], ")", p_to_stars(anova(model4, model5)$'Pr(>Chisq)'[2]))
+      )
+  ),
+  #no.space = TRUE,
+  keep.stat = c("aic", "ll"),
+  star.cutoffs = NA,
+  notes.align	= "l",
+  # notes = "\\parbox{0.9\\textwidth}{Model 1 includes only initialization conditions, Model 2 adds within-dataset covariates, Model 3 adds between-dataset covariates, Model 4 adds random slopes for initialization, and Model 5 adds interaction terms. $^{*} p<0.1; ^{**} p<0.05; ^{***} p<0.01$}",
+  notes.label  = "",
+  notes = c(
+    "Model 1: only initialization conditions.",
+    "Model 2: adds within-dataset covariates.",
+    "Model 3: adds between-dataset covariates.",
+    "Model 4: adds random effects for initialization.",
+    "Model 5: adds interaction terms.",
+    "$^{*} p<0.1; ^{**} p<0.05; ^{***} p<0.01$"
+  ),
+  notes.append  = FALSE,
+  header = TRUE,
   out = here::here("Report/results/results_table.tex")
 )
 
+
+
 ```
+
+
 
