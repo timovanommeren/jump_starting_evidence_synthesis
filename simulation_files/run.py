@@ -11,18 +11,18 @@ from metrics import aggregate_recall_plots
 #stimulus_for_llm = ['inclusion_criteria', 'exclusion_criteria']
 
 # Parameters for running simulations
-n_simulations = 2
+n_simulations = 10
 stop_at_n = 100 # set to -1 to stop when all relevant records are found
 
 # Parameters for simulation (IVs)
-n_abstracts = [1, 2, 3]
+n_abstracts = [1, 3, 5, 7, 10]
 length_abstracts = [200, 500, 1000]
 typicality = [0.90]
 degree_jargon = [0.10]
-llm_temperature = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+llm_temperature = [0.0, 0.4, 0.8]
 
 # Parameters for evaluation (DVs)
-tdd_threshold = 100
+tdd_threshold = stop_at_n if stop_at_n != -1 else 100
 wss_threshold = .95
 
 # Parameters for reproducibility
@@ -41,7 +41,12 @@ def run(
 ):
   
   
-    ### RETRIEVE INPUT #########################################################################################
+    ### RETRIEVE INPUT #######################################################################################
+    
+    # Resolve in_dir relative to project root (parent of simulation_files/) !!! DOESNT WORK YET
+    script_dir = Path(__file__).parent
+    project_root = script_dir.parent
+    in_dir = project_root / in_dir
     
     # import the paths of all files in the input directory
     data_paths = [f for f in Path(in_dir).iterdir() if f.is_file()]
@@ -49,8 +54,8 @@ def run(
     # import all the of the datasets
     datasets = {file.stem: pd.read_csv(file) for file in data_paths}
 
-    # ### Create smaller subset of datasets for testing ########################################################
-    # selected_keys = ['Walker_2018', 'Wassenaar_2017', 'Hall_2012', 'Brouwer_2019', 'Moran_2021', 'Leenaars_2020', 'Muthu_2021']
+    # # ### Create smaller subset of datasets for testing ####################################################
+    # selected_keys = ['Brouwer_2019']
     # subset_datasets = {k: datasets[k] for k in selected_keys if k in datasets}
     # datasets = subset_datasets
     
@@ -58,7 +63,7 @@ def run(
 
     ##########################################################################################################
 
-    ### CREATE OUTPUT DIRECTORIES #############################################################################
+    ### CREATE OUTPUT DIRECTORIES ############################################################################
 
     # create output directories for each dataset
     for dataset in datasets:
@@ -66,8 +71,10 @@ def run(
         
 
         
-    # load synergy metadata
-    synergy_metadata = pd.read_excel(r'C:\Users\timov\Desktop\Utrecht\Utrecht\MSBBSS\thesis_timo\Synergy\synergy_dataset_overview.xlsx')
+    # load synergy metadata (path relative to this script's location)
+    script_dir = Path(__file__).parent
+    synergy_path = script_dir.parent / 'Synergy' / 'synergy_dataset_overview.xlsx'
+    synergy_metadata = pd.read_excel(synergy_path)
 
     #convert string of stimulus for llm to list
     stimulus_for_llm = stimulus_for_llm.split(' ')
@@ -80,7 +87,7 @@ def run(
 
 
 
-    ### SIMULATE AND EVALUATE #################################################################################
+    ### SIMULATE AND EVALUATE ###############################################################################
     
     # Generate all combinations of IVs
     iv_combinations = list(itertools.product(
@@ -94,12 +101,14 @@ def run(
     print(f"Running {n_simulations} simulations for each of {len(iv_combinations)} IV combinations")
     print(f"Total simulations: {n_simulations * len(iv_combinations)}")
     
-    for combo_idx, (n_abs, len_abs, typ, jargon, temp) in enumerate(iv_combinations, 1):
-        print(f"\nIV Combination {combo_idx}/{len(iv_combinations)}: "
-              f"n_abstracts={n_abs}, length={len_abs}, typicality={typ}, "
-              f"jargon={jargon}, temperature={temp}")
+    
+    for sim in range(n_simulations):
+       
+        for combo_idx, (n_abs, len_abs, typ, jargon, temp) in enumerate(iv_combinations, 1):
+            print(f"\nIV Combination {combo_idx}/{len(iv_combinations)}: "
+                f"n_abstracts={n_abs}, length={len_abs}, typicality={typ}, "
+                f"jargon={jargon}, temperature={temp}")
         
-        for sim in range(n_simulations):
             run_simulation(
                 datasets=datasets,
                 criterium=stimulus_for_llm,
