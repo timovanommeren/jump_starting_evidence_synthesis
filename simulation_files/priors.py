@@ -2,7 +2,7 @@ import numpy as np
 from typing import Dict, List
 import pandas as pd
 
-def sample_minimal_priors(dataset: pd.DataFrame, seed: int) -> List[int]:
+def sample_priors(dataset: pd.DataFrame, seed: int) -> List[int]:
 
     indices_w0 = np.where(dataset['label_included'].to_numpy() == 0)[0]
     indices_w1 = np.where(dataset['label_included'].to_numpy() == 1)[0]
