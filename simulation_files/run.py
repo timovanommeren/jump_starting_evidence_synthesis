@@ -54,14 +54,18 @@ def run(
     # import all the of the datasets
     datasets = {file.stem: pd.read_csv(file) for file in data_paths}
 
-    # # ### Create smaller subset of datasets for testing ####################################################
-    # selected_keys = ['Brouwer_2019']
-    # subset_datasets = {k: datasets[k] for k in selected_keys if k in datasets}
-    # datasets = subset_datasets
+    # ### Create smaller subset of datasets for testing ####################################################
+    selected_keys = ['Brouwer_2019']
+    subset_datasets = {k: datasets[k] for k in selected_keys if k in datasets}
+    datasets = subset_datasets
     
-    # print(f"Running simulations on datasets: {list(datasets.keys())}")
+    print(f"Running simulations on datasets: {list(datasets.keys())}")
 
     ##########################################################################################################
+
+
+
+
 
     ### CREATE OUTPUT DIRECTORIES ############################################################################
 
@@ -86,7 +90,6 @@ def run(
 
 
 
-
     ### SIMULATE AND EVALUATE ###############################################################################
     
     # Generate all combinations of IVs
@@ -102,10 +105,10 @@ def run(
     print(f"Total simulations: {n_simulations * len(iv_combinations)}")
     
     
-    for sim in range(n_simulations):
+    for run in range(n_simulations):
        
-        for combo_idx, (n_abs, len_abs, typ, jargon, temp) in enumerate(iv_combinations, 1):
-            print(f"\nIV Combination {combo_idx}/{len(iv_combinations)}: "
+        for combo_idx, (n_abs, len_abs, typ, jargon, temp) in enumerate(iv_combinations):
+            print(f"\nIV Combination {combo_idx + 1}/{len(iv_combinations)}: "
                 f"n_abstracts={n_abs}, length={len_abs}, typicality={typ}, "
                 f"jargon={jargon}, temperature={temp}")
         
@@ -121,8 +124,8 @@ def run(
                 llm_temperature=temp,
                 tdd_threshold=tdd_threshold,
                 wss_threshold=wss_threshold,
-                seed=seed,
-                run=sim + 1,  # 1-based replicate index
+                seed=seed + run * len(iv_combinations) + combo_idx,  # unique seed per simulation
+                run=run * len(iv_combinations) + combo_idx + 1,  # global run counter starting from 1
                 stop_at_n=stop_at_n
             )
 
@@ -139,11 +142,7 @@ def run(
     
     ############################################################################################################
 
-    return  
-
-@app.command()
-def hello():
-    print('hello')
+    return
 
 if __name__ == "__main__":
     app()
