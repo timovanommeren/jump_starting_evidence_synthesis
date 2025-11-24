@@ -21,7 +21,7 @@ descriptive_barchart <- function(data, metadata) {
     group_by(dataset, condition) %>% 
     summarise(mean_value = mean(td), .groups = "drop") %>% 
     pivot_wider(names_from = condition, values_from = mean_value) %>% 
-    mutate(contrast = .data[["llm"]] - .data[["no_priors"]]) %>% 
+    mutate(contrast = .data[["llm"]] - .data[["no_initialisation"]]) %>% 
     select(dataset, contrast) 
   
   # Step 2: join contrast back to full data 
@@ -67,11 +67,11 @@ descriptive_barchart <- function(data, metadata) {
     scale_fill_manual(                      
       values = c(
         llm       = "chartreuse3",
-        minimal   = "blue",
-        no_priors = "red"
+        random   = "blue",
+        no_initialisation = "red"
         
       ),
-      breaks = c("llm", "minimal", "no_priors"),
+      breaks = c("llm", "random", "no_initialisation"),
       labels = c("LLM-generated", "True examples", "None")
     ) +
     theme_minimal() +

@@ -1,0 +1,300 @@
+---
+title: "structual_missingness"
+output: html_document
+date: "2025-11-24"
+---
+
+```{r}
+library(here)
+
+source(here("Analysis/R/00_packages.R"))
+source(here("Analysis/R/01_load_data.R"))
+source(here("Analysis/R/02_prepare_data.R"))
+source(here("Analysis/R/03_descriptives.R"))
+# source(here("R/04_models.R"))
+# source(here("R/05_plots.R"))
+
+load_packages()
+
+```
+
+## Loading and transforming data
+
+```{r load and transform data}
+
+# import simulation results and metadata (specify paths relative to project root)
+raw <- load_simulation_data(data = "simulation_results/adding_NAs/all_simulation_results.csv", 
+                             metadata = "Analysis/percentage_relevant.csv")
+
+# (1) transform simulation data to wide
+# (2) adjust metadata column names, and, 
+# (3) add the number of records and percent_rel of relevant records from metadata to simulation data (these will serve as group-level predictors in multilevel model)
+processed <- prepare_data(raw$simulation, raw$meta)
+
+# assign to variables for easier access
+simulation_long <- raw$simulation
+simulation      <- processed$simulation
+metadata        <- processed$meta
+
+```
+
+
+```{r}
+
+#plot a histogram of n_abstracts
+ggplot(simulation, aes(x = n_abstracts)) +
+  geom_histogram(binwidth = 1, fill = "lightblue", color = "black") +
+  labs(title = "Histogram of n_abstracts",
+       x = "Number of Abstracts",
+       y = "Frequency") +
+  theme_minimal()
+
+
+#plot the distribution of td against the IV: n_abstracts
+# Note that n_abstracts has 5 imposed categories and no measurement error. So we should use jitter to better visualize the data points.
+
+ggplot(simulation, aes(x = n_abstracts, y = td)) +
+  geom_jitter(width = 0.2, height = 0, alpha = 0.5) +
+  geom_smooth(method = "lm", se = TRUE, color = "blue") +
+  labs(title = "Distribution of td against n_abstracts",
+       x = "Number of Abstracts",
+       y = "td") +
+  theme_minimal()
+
+correlation_n_abstracts_td <- cor(simulation$n_abstracts, simulation$td, use = "complete.obs")
+correlation_n_abstracts_td
+```
+
+### Recoding and centering LLM parameters to account for the fact that the first level IVs are only defined in the llm condition
+
+```{r}
+
+simulation <- simulation %>%
+  mutate(
+    # indicator where llm parameters are actually defined
+    llm_active = (condition == "llm"),
+
+    # center within llm, set to 0 elsewhere (two-part coding)
+    n_abstracts_llm = ifelse(
+      llm_active,
+      n_abstracts - mean(n_abstracts[llm_active], na.rm = TRUE),
+      0
+    ),
+    length_abstracts_llm = ifelse(
+      llm_active,
+      length_abstracts - mean(length_abstracts[llm_active], na.rm = TRUE),
+      0
+    ),
+    llm_temperature_llm = ifelse(
+      llm_active,
+      llm_temperature - mean(llm_temperature[llm_active], na.rm = TRUE),
+      0
+    )
+  )
+
+```
+
+
+
+#### Data visualisation
+
+Let's plot the recoded data to illustrate that the centered variables are only defined in the llm condition.
+```{r}
+ggplot(simulation, aes(x = n_abstracts_llm, y = td, color = condition)) +
+  geom_point(alpha = 0.5) +
+  labs(title = "Recoded n_abstracts_llm vs td",
+       x = "Recoded n_abstracts_llm",
+       y = "td") +
+  theme_minimal()
+
+```
+
+### LLM-condition specific variables
+
+
+
+```{r}
+model0 <- lmer(td ~ 1 + (1|dataset), REML = F, data = simulation)
+summary(model0)
+
+```
+
+```{r}
+model1 <- lmer(td ~ condition + (1|dataset), REML = F, data = simulation)
+summary(model1)
+anova(model1, model0)
+```
+
+
+
+```{r}
+simulation$condition <- relevel(simulation$condition, ref = "llm")
+
+simulation_llm <- simulation %>% filter(condition == "llm")
+
+model2 <- lmer(
+  td ~ 
+       n_abstracts_llm + length_abstracts_llm + llm_temperature_llm +
+       (1 | dataset),
+  REML = FALSE,
+  data = simulation_llm
+)
+
+summary(model2)
+anova(model2, model1)
+```
+
+
+```{r}
+
+model2b <- lmer(
+  td ~ 
+       n_abstracts + length_abstracts + llm_temperature +
+       (1 | dataset),
+  REML = FALSE,
+  data = simulation_llm
+)
+
+summary(model2)
+
+```
+
+
+
+```{r}
+
+model3 <- lmer(
+  td ~ condition + 
+       condition * (n_abstracts_llm + length_abstracts_llm + llm_temperature_llm) +
+       (1 | dataset),
+  REML = FALSE,
+  data = simulation
+)
+
+summary(model3)
+anova(model3, model2)
+```
+
+Let's see if the method proposed by Dzaik and applied above is valid by seeing if we get the same regression coefficients when we split the data and run the model only on the llm condition and on the two remaining conditions separately.
+
+```{r}
+simulation_llm <- simulation %>% filter(condition == "llm")
+
+model_llm_only <- lmer(
+  td ~ 
+       n_abstracts + length_abstracts + llm_temperature +
+       (1 | dataset),
+  REML = FALSE,
+  data = simulation_llm
+)
+
+```
+
+```{r}
+simulation_random <- simulation %>% filter(condition == "random")
+
+simulation_random <- lmer(
+  td ~ 
+       (1 | dataset),
+  REML = FALSE,
+  data = simulation_random
+)
+
+```
+
+```{r}
+simulation_no_init <- simulation %>% filter(condition == "no_initialisation")
+
+simulation_no_init <- lmer(
+  td ~ 
+       (1 | dataset),
+  REML = FALSE,
+  data = simulation_no_init
+)
+
+```
+
+
+```{r}
+
+fixef(model_llm_only)["(Intercept)"] - fixef(simulation_random)["(Intercept)"]; fixef(model3)["conditionrandom"]
+
+fixef(simulation_no_init)["(Intercept)"] - fixef(model_llm_only)["(Intercept)"];
+fixef(model3)["conditionno_initialisation"]
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+lm_llm_full_representation <- lm(
+  td ~ condition + 
+       condition * (n_abstracts_llm + length_abstracts_llm + llm_temperature_llm)
+  data = simulation
+)
+
+```
+
+
+
+
+
+```{r}
+# 1) Big two-part model (no random effects)
+lm_big <- lm(
+  td ~ condition +
+       n_abstracts_llm + length_abstracts_llm + llm_temperature_llm,
+  data = simulation
+)
+
+# 2) Separate models
+lm_llm <- lm(
+  td ~ n_abstracts + length_abstracts + llm_temperature,
+  data = subset(simulation, condition == "llm")
+)
+
+lm_random <- lm(
+  td ~ 1,
+  data = subset(simulation, condition == "random")
+)
+
+lm_noinit <- lm(
+  td ~ 1,
+  data = subset(simulation, condition == "no_initialisation")
+)
+
+```
+
+
+```{r}
+# Compare fitted values
+coef(lm_big)["(Intercept)"] + coef(lm_big)["conditionrandom"]; coef(lm_random)["(Intercept)"]
+coef(lm_big)["(Intercept)"] + coef(lm_big)["conditionno_initialisation"]; coef(lm_noinit)["(Intercept)"]
+
+```
+
+

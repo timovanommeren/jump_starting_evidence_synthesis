@@ -8,13 +8,18 @@ from prompting import generate_abstracts
 
 ### Prepare the llm datasets ###
 
-def prepare_llm_datasets(dataset: pd.DataFrame, name: str, criterium: list, out_dir: Path, metadata: pd.ExcelFile, n_abstracts: int, length_abstracts: int, typicality: float, degree_jargon: float, llm_temperature: float, run: int) -> dict:
+def prepare_datasets(dataset: pd.DataFrame, name: str, criterium: list, out_dir: Path, metadata: pd.ExcelFile, n_abstracts: int, length_abstracts: int, typicality: float, degree_jargon: float, llm_temperature: float, run: int) -> dict:
+
+    ### RETRIEVE CRITERIA FROM METADATA ##########################################################
 
     stimuli = select_criteria(name, criterium, metadata)
     
     # Skip if no stimuli found (dataset missing from metadata)
     if not stimuli:
         return None
+
+
+    ### GENERATE ABSTRACTS #################################################################
 
     generated_abstracts = generate_abstracts(name=name, stimulus=stimuli, out_dir=out_dir, n_abstracts=n_abstracts, length_abstracts=length_abstracts, typicality=typicality, degree_jargon=degree_jargon, llm_temperature=llm_temperature, run=run)
      
@@ -36,6 +41,9 @@ def prepare_llm_datasets(dataset: pd.DataFrame, name: str, criterium: list, out_
 
     if n_included != n_abstracts or n_excluded != n_abstracts:
         print(f"WARNING: Dataset {name} failed to generate correct ratio after {max_retries} attempts. Proceeding with {n_included} included and {n_excluded} excluded.")
+ 
+ 
+    ### APPEND GENERATED ABSTRACTS TO DATASET ##########################################################
              
     # concatenate original dataset with generated abstracts for simulation
     dataset_llm = pd.concat([dataset, generated_abstracts.drop(columns=['reasoning'])], ignore_index=True) # concatenate original dataset with generated abstracts
@@ -46,5 +54,30 @@ def prepare_llm_datasets(dataset: pd.DataFrame, name: str, criterium: list, out_
         'dataset': dataset_llm,
         'prior_idx': llm_prior_idx
     }
+ 
+
+ 
+
+    ### APPEND CRITERIA TO DATASET (AS CONTROL CONDITION) ##########################################################   
+    
+    # Create dataframe with 2 prior rows: inclusion criteria (label=1) and exclusion criteria (label=0)
+    included_row = {col: '' for col in dataset.columns}
+    excluded_row = {col: '' for col in dataset.columns}
+    included_row['abstract'] = stimuli['inclusion_criteria']
+    included_row['label_included'] = 1
+    excluded_row['abstract'] = stimuli['exclusion_criteria']
+    excluded_row['label_included'] = 0
+    criteria_data = pd.DataFrame([included_row, excluded_row])
+
         
-    return datasets_llms
+    # concatenate original dataset with criteria for simulation
+    dataset_criteria = pd.concat([dataset, criteria_data], ignore_index=True) # concatenate original dataset with criteria
+    criteria_idx = np.array(range(len(dataset), len(dataset_criteria))) # get indices of criteria to use as priors
+    
+    #store dataset with criteria and prior indices in dictionary
+    datasets_criteria = {
+        'dataset': dataset_criteria,
+        'prior_idx': criteria_idx
+    }
+        
+    return datasets_llms, datasets_criteria

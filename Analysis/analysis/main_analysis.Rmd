@@ -21,8 +21,9 @@ load_packages()
 
 ```{r load and transform data}
 
-# import simulation results and metadata
-raw <- load_simulation_data()
+# import simulation results and metadata (specify paths relative to project root)
+raw <- load_simulation_data(data = "simulation_results/adding_NAs/all_simulation_results.csv", 
+                             metadata = "Analysis/percentage_relevant.csv")
 
 # (1) transform simulation data to wide
 # (2) adjust metadata column names, and, 
@@ -158,29 +159,15 @@ ICC = Intercept_variances[Intercept_variances$grp == 'dataset','vcov'] / (Interc
 print(ICC)
 ```
 
+
 ```{r}
 
 model1 <- lmer(td ~ condition  + (1|dataset), REML = F, data = simulation)
-summary(model2)
-anova(model2, model1)
+summary(model1)
+anova(model1, model0)
 ```
 
 
-```{r}
-#grand mean centering of continuous predictors
-simulation <- simulation %>%
-  mutate(
-    n_abstracts       = n_abstracts - mean(n_abstracts),
-    length_abstracts  = length_abstracts - mean(length_abstracts),
-    llm_temperature   = llm_temperature - mean(llm_temperature),
-    records           = records - mean(records),
-    percent_rel               = percent_rel - mean(percent_rel)
-  )
-
-#scale 'records' variable
-simulation$records <- scale(simulation$records)
-
-```
 
 
 ```{r}
@@ -194,7 +181,7 @@ anova(model2, model1)
 15742    
 
 ```{r}
-model3 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + records + percent_rel + (1|dataset), REML = F, data = simulation)
+model3 <- lmer(td ~ condition + records + percent_rel + (1|dataset), REML = F, data = simulation)
 summary(model3)
 anova(model3, model2)
 ```
@@ -415,6 +402,12 @@ stargazer(
 
 
 ```
+
+
+
+
+
+
 
 
 

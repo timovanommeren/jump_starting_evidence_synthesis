@@ -6,7 +6,7 @@ prepare_data <- function(simulation_long, metadata) {
   
   #transform data from wide to long format
   data = pivot_wider(simulation_long,
-                     id_cols    = c(dataset, condition, run, n_abstracts, length_abstracts, typicality, degree_jargon, llm_temperature),
+                     id_cols    = c(dataset, condition, run, n_abstracts, length_abstracts, typicality, degree_jargon, llm_temperature, timestamp),
                      names_from = metric,
                      values_from = value)
   
