@@ -1,0 +1,190 @@
+---
+title: "Dziak_reproduction"
+output: html_document
+date: "2025-11-25"
+---
+
+# Preparation
+
+```{r}
+library(here)
+
+source(here("Analysis/R/00_packages.R"))
+source(here("Analysis/R/01_load_data.R"))
+source(here("Analysis/R/02_prepare_data.R"))
+source(here("Analysis/R/03_descriptives.R"))
+# source(here("R/04_models.R"))
+# source(here("R/05_plots.R"))
+
+load_packages()
+
+```
+
+## Loading and transforming data
+
+```{r load and transform data}
+
+# import simulation results and metadata (specify paths relative to project root)
+raw <- load_simulation_data(data = "simulation_results/adding_NAs/all_simulation_results.csv", 
+                             metadata = "Analysis/percentage_relevant.csv")
+
+# (1) transform simulation data to wide
+# (2) adjust metadata column names, and, 
+# (3) add the number of records and percent_rel of relevant records from metadata to simulation data (these will serve as group-level predictors in multilevel model)
+processed <- prepare_data(raw$simulation, raw$meta)
+
+# assign to variables for easier access
+simulation_long <- raw$simulation
+simulation      <- processed$simulation
+metadata        <- processed$meta
+
+```
+
+
+# Classical dummy variable adjustment
+
+## Creating dummy variable for LLM condition and imputing LLM parameters in non-LLM conditions
+
+```{r}
+
+#create dummy variables for all three conditions
+simulation <- simulation %>%
+  mutate(
+    condition_llm = ifelse(condition == "llm", 1, 0),
+    condition_random = ifelse(condition == "random", 1, 0),
+    condition_no_initialisation = ifelse(condition == "no_initialisation", 1, 0)
+  )
+
+#impute the llm parameters to 0 in the non-llm conditions
+simulation <- simulation %>%
+  mutate(
+    n_abstracts_imputed = ifelse(condition == "llm", n_abstracts, mean(n_abstracts, na.rm = TRUE)),
+    length_abstracts_imputed = ifelse(condition == "llm", length_abstracts, mean(length_abstracts, na.rm = TRUE)),
+    llm_temperature_imputed = ifelse(condition == "llm", llm_temperature, mean(llm_temperature, na.rm = TRUE))
+  )
+
+```
+
+
+## Setting reference level for condition
+
+```{r}
+#set condition as factor
+simulation$condition <- as.factor(simulation$condition)
+
+#set 'random' as the reference level
+simulation$condition <- relevel(simulation$condition, ref = "llm")
+```
+
+
+## Running linear model with dummy variable adjustment
+
+```{r}
+lm_DVA <- lm(
+  td ~ condition_random + condition_no_initialisation +
+       n_abstracts_imputed + length_abstracts_imputed + llm_temperature_imputed
+    ,
+  data = simulation
+)
+
+summary(lm_DVA)
+
+```
+
+# Two-part predictor coding (the method by Dziak and Henry (2017))
+
+## Two-part recoding of LLM parameters
+
+```{r}
+
+simulation <- simulation %>%
+  mutate(
+    
+    # indicator where llm parameters are actually defined
+    llm_active = (condition == "llm"),
+
+    # set to 0 if not llm condition (two-part coding)
+    n_abstracts_llm = ifelse(
+      llm_active,
+      n_abstracts - mean(n_abstracts[llm_active], na.rm = TRUE),
+      0
+    ),
+    length_abstracts_llm = ifelse(
+      llm_active,
+      length_abstracts  - mean(length_abstracts[llm_active], na.rm = TRUE),
+      0
+    ),
+    llm_temperature_llm = ifelse(
+      llm_active,
+      llm_temperature - mean(llm_temperature[llm_active], na.rm = TRUE),
+      0
+    )
+  )
+
+```
+
+
+
+## Running two-part regression
+
+```{r}
+
+lm_2part <- lm(
+  td ~ condition +
+       n_abstracts_llm + length_abstracts_llm + llm_temperature_llm,
+  data = simulation
+)
+
+summary(lm_2part)
+```
+
+### Compare DVA with two-part coding
+
+```{r}
+# Compare main effects
+coef(lm_DVA)["(Intercept)"] + coef(lm_DVA)["condition_random"]; coef(lm_2part)["(Intercept)"] + coef(lm_2part)["conditionrandom"]
+coef(lm_DVA)["(Intercept)"] + coef(lm_DVA)["condition_no_initialisation"]; coef(lm_2part)["(Intercept)"] + coef(lm_2part)["conditionno_initialisation"]
+
+# Compare LLM parameters
+coef(lm_DVA)["n_abstracts_imputed"]; coef(lm_2part)["n_abstracts_llm"]
+coef(lm_DVA)["length_abstracts_imputed"]; coef(lm_2part)["length_abstracts_llm"]
+coef(lm_DVA)["llm_temperature_imputed"]; coef(lm_2part)["llm_temperature_llm"]
+```
+The coefficients of the two models match.
+
+
+## Split dataset two further support two-part coding results
+
+```{r}
+
+lm_llm <- lm(
+  td ~ n_abstracts + length_abstracts + llm_temperature,
+  data = subset(simulation, condition == "llm")
+)
+
+lm_random <- lm(
+  td ~ 1,
+  data = subset(simulation, condition == "random")
+)
+
+lm_noinit <- lm(
+  td ~ 1,
+  data = subset(simulation, condition == "no_initialisation")
+)
+
+```
+
+
+```{r}
+# Compare main effects
+coef(lm_big)["(Intercept)"] + coef(lm_big)["conditionrandom"]; coef(lm_random)["(Intercept)"]
+coef(lm_big)["(Intercept)"] + coef(lm_big)["conditionno_initialisation"]; coef(lm_noinit)["(Intercept)"]
+
+# Compare LLM parameters
+coef(lm_big)["n_abstracts_llm"]; coef(lm_llm)["n_abstracts"]
+coef(lm_big)["length_abstracts_llm"]; coef(lm_llm)["length_abstracts"]
+coef(lm_big)["llm_temperature_llm"]; coef(lm_llm)["llm_temperature"]
+
+```
+
+The coefficients of the two-part coding model match those from the separate models. This further supports the validity of the two-part coding approach.

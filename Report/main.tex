@@ -137,7 +137,7 @@ Starting performance will be assessed based on the number relevant papers in the
 
 \subsubsection{Padding}
 
-It is important to note that the simulation may stop prematurely if all the relevant records are found before the desired stopping rule is reached (e.g. screening 100 records). In order to accurately emulate a researcher who is unaware that all the relevant records have been found and who therefore continues to screen until the stopping rule is reached, the simulation results were appended with rows containing the label 'zero' (i.e. irrelevant records). The number of these rows equaled the number of records that should have been screened minus the number of records that were screened minus the number of records that were provided prior to screening. This is referred to as padding and ensures that the final simulation results are accurate.
+It is important to note that the simulation may stop prematurely if all the relevant records are found before the desired stopping rule is reached (e.g. screening 100 records). In order to accurately emulate a researcher who is unaware that all the relevant records have been found and who therefore continues to screen until the stopping rule is reached, the simulation results were appended with rows containing the label 'zero' (i.e. irrelevant records). The number of these rows is determined by taking the number of records that should have been screened (the stopping rule) minus the number of records that were screened (in the random initialisation condition the number of records that were provided prior to screening is also subtracted). This is referred to as padding and ensures that the final simulation results are accurate.
 
 \subsubsection{Recall plots}
 
@@ -183,6 +183,12 @@ This yields a data-frame containing one observation for each combination of data
 \subsubsection{Analysis}
 
 The majority of the variance in the number of relevant records found in the first 100 screened is expected to be explained by differences between datasets. We would therefore like to seperate within-dataset variance from between-dataset variance. Ideal for this purpose are  linear mixed-effects models (LMEMs) which allow us to model the effect of condition on starting performance while accounting for between-dataset variance by including dataset as a random effect. To confirm that most of the variance is indeed between datasets, we will visualize the data using boxplots and fit a null model with only dataset as a random effect to calculate the intraclass correlation coefficient (ICC). A bottom-up modelling approach will then be used for multilevel analysis (for approach see chapter 4 of the book by \cite{hox2017multilevel}) and will be conducted in R using the \textit{lme4} package  \parencite{bates2015fitting}. %(version 1.1.36)
+
+We are dealing with structual missing data because not all independent variable levels are applicable to all runs (i.e., the independent variables only have an effect in the LLM initialisation condition). A common approach to deal with this kind of missing data is to use multiple imputation. However, since these variables only have causal meaning in the LLM initialisation condition, imputation does not make conceptual sense. Similarly, model parameter estimation using full maximum likelihood estimation or bayesian estimation would not make conceptual sense (since the MAR assumption would be violated). Another solution would be to simply parse the analysis into two parts: (1) investigate the effect of condition on starting performance, and (2) investigate the effect of the independent variables in the LLM initialisation condition on starting performance. This however would decrease the power of the analysis. Finally, we may reflect the structual missingness in the model by including interaction effects between condition and the independent variables. This way, the independent variables will only have an effect in the LLM initialisation condition. (Note that structual missingness is different from planned missingness.)
+
+One way of dealing with missing data is Dummy Variable Adjustment (DVA). This approach has largely fallen out of favour due to an analysis by \parencite{jones1996indicator} which showed that even when data are missing completely at random (MCAR), DVA produces biased estimates. However, this result is only true if the missing values could plausibly have a value. In our case, the missing values are structurally missing and have no meaning outside of the LLM initialisation condition. Therefore, DVA may be a valid approach to deal with the structural missingness in our data. Furthermore, recent work by \parencite{dziak2017two} show that DVA is algebraically equivalent to including interaction effects between the variable with missing data and the indicator variable for missingness, and imputating the missing data with zero (Note that the model is invarient to the actual imputed value. However, the interpretation of the coeffcients of the other two conditions should be relative to the imputed value. Therefore, mean or zero imputation is recommended.)
+
+
 
 \vspace{0.5cm}
 
@@ -249,8 +255,10 @@ As expected, most of the variance in starting performance seems to be explained 
     \item Another possible limitation: no switching of active leaning cycles (could fix contamination of synthetic data issue). 
 \end{enumerate}
 
+Clusters should not be a problem because we only focus on starting performance (i.e., first 100 screened). Future work may consider the contamination hypothesis in more detail. 
 
 %TC:ignore
+
 \appendix
 
 \section{SYNERGY metadata}

@@ -50,6 +50,34 @@ summary(simulation)
 ```
 
 
+```{r}
+
+simulation <- simulation %>%
+  mutate(
+    
+    # indicator where llm parameters are actually defined
+    llm_active = (condition == "llm"),
+
+    # set to 0 if not llm condition (two-part coding)
+    n_abstracts = ifelse(
+      llm_active,
+      n_abstracts - mean(n_abstracts[llm_active], na.rm = TRUE),
+      0
+    ),
+    length_abstracts = ifelse(
+      llm_active,
+      length_abstracts  - mean(length_abstracts[llm_active], na.rm = TRUE),
+      0
+    ),
+    llm_temperature = ifelse(
+      llm_active,
+      llm_temperature - mean(llm_temperature[llm_active], na.rm = TRUE),
+      0
+    )
+  )
+
+```
+
 ### Descriptive plots
 
 #### Bar chart of number of relevant records found per dataset and condition
@@ -199,6 +227,23 @@ model5 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature
 summary(model5)
 anova(model5, model4)
 ```
+
+### Checking normality of residuals
+
+```{r}
+#plot QQ plots of residuals
+qqnorm(residuals(model5))
+
+#plot QQ plots of random means
+qqnorm(ranef(model5)$dataset[,1])
+
+#plot QQ plots of random effect with no initialization condition 
+qqnorm(ranef(model5)$dataset[,2])
+
+#plot QQ plots of random effect with random initialization condition
+qqnorm(ranef(model5)$dataset[,3])
+```
+
 
 
 ## Exporting Results

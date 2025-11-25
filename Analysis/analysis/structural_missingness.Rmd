@@ -65,12 +65,104 @@ correlation_n_abstracts_td <- cor(simulation$n_abstracts, simulation$td, use = "
 correlation_n_abstracts_td
 ```
 
+```{r}
+
+#make dummy variable of n_abstracts, which is 0 below median and 1 above median
+median_n_abstracts <- median(simulation$n_abstracts, na.rm = TRUE)
+
+simulation <- simulation %>%
+  mutate(
+    n_abstracts_dummy = ifelse(n_abstracts <= median_n_abstracts, 0, 1)
+  )
+
+#impute all NAs in n_abstracts_dummy with 0
+simulation$n_abstracts_dummy[is.na(simulation$n_abstracts_dummy)] <- 0
+
+#plot a histogram of n_abstracts_dummy
+hist(simulation$n_abstracts_dummy, 
+     main = "Histogram of n_abstracts_dummy", 
+     xlab = "n_abstracts_dummy", 
+     col = "lightgreen", 
+     border = "black")
+
+# renamee n_abstracts_dummy to n_abstracts_above_median
+simulation <- simulation %>%
+  rename(llm_condition_abstract_high = n_abstracts_dummy)
+
+#create a new dummy llm_condition_abstract_low by taking the difference between llm = 1 and llm_condition_abstract_high
+
+simulation$llm_condition_abstract_low = simulation$condition_llm - simulation$llm_condition_abstract_high
+
+```
+
+```{r}
+
+#create three new dummy variables, each corresponding to one of the three conditions
+simulation <- simulation %>%
+  mutate(
+    condition_llm = ifelse(condition == "llm", 1, 0),
+    condition_random = ifelse(condition == "random", 1, 0),
+    condition_no_initialisation = ifelse(condition == "no_initialisation", 1, 0)
+  )
+
+#reorder the columns to have the conditions first
+simulation <- simulation %>%
+  select(dataset, condition_llm, condition_random, condition_no_initialisation, llm_condition_abstract_high, llm_condition_abstract_low, everything())
+
+```
+
+```{r}
+
+dummy_model <- lm(td ~ condition_random + condition_no_initialisation + dataset, data = simulation)
+
+summary(dummy_model)
+
+```
+
+
+### Testing how relevel works
+
+```{r}
+
+hist(simulation$n_abstracts)
+
+#run basic linear model
+model_test <- lm(td ~ condition * n_abstracts + dataset, data = simulation)
+
+
+
+summary(model_test)
+head(model.matrix(model_test))
+
+
+# Check  the  design  matrix  by  computing  the  crossproduct
+crossprod(model.matrix(model_test))
+```
+
+
+```{r}
+
+#set conditions as factor 
+simulation$condition <- as.factor(simulation$condition)
+
+# relevel condition to set "random" as the reference level
+simulation$condition <- relevel(simulation$condition, ref = "llm")
+
+#run basic linear model
+model_test <- lm(td ~ condition, data = simulation)
+summary(model_test)
+head(model.matrix(model_test))
+```
+
+
+
 ### Recoding and centering LLM parameters to account for the fact that the first level IVs are only defined in the llm condition
 
 ```{r}
 
 simulation <- simulation %>%
   mutate(
+    
     # indicator where llm parameters are actually defined
     llm_active = (condition == "llm"),
 
@@ -116,47 +208,58 @@ ggplot(simulation, aes(x = n_abstracts_llm, y = td, color = condition)) +
 ```{r}
 model0 <- lmer(td ~ 1 + (1|dataset), REML = F, data = simulation)
 summary(model0)
-
 ```
 
 ```{r}
 model1 <- lmer(td ~ condition + (1|dataset), REML = F, data = simulation)
 summary(model1)
+
 anova(model1, model0)
+
+
+summary(lm(td ~ condition + dataset, data = simulation))
+
+# model.matrix(model1)
+# lme4::getME(model1, "X")
+# 
+# ?lme4::getME()
+# lme4::getME(model1, "Z")
+# 
+# ?show()
 ```
 
 
 
 ```{r}
-simulation$condition <- relevel(simulation$condition, ref = "llm")
 
-simulation_llm <- simulation %>% filter(condition == "llm")
+#simulation_llm <- simulation %>% filter(condition == "llm")
 
-model2 <- lmer(
-  td ~ 
+model2a <- lmer(
+  td ~ condition +
        n_abstracts_llm + length_abstracts_llm + llm_temperature_llm +
        (1 | dataset),
   REML = FALSE,
-  data = simulation_llm
+  data = simulation
 )
 
-summary(model2)
-anova(model2, model1)
+summary(model2a)
+anova(model2a, model1)
 ```
+
 
 
 ```{r}
 
-model2b <- lmer(
-  td ~ 
-       n_abstracts + length_abstracts + llm_temperature +
-       (1 | dataset),
-  REML = FALSE,
-  data = simulation_llm
-)
-
-summary(model2)
-
+# model2b <- lmer(
+#   td ~ condition + 
+#        condition * (n_abstracts_llm + length_abstracts_llm + llm_temperature_llm) +
+#        (1 | dataset),
+#   REML = FALSE,
+#   data = simulation
+# )
+# 
+# summary(model2b)
+# anova(model2b, model2a)
 ```
 
 
@@ -164,16 +267,34 @@ summary(model2)
 ```{r}
 
 model3 <- lmer(
-  td ~ condition + 
-       condition * (n_abstracts_llm + length_abstracts_llm + llm_temperature_llm) +
+  td ~ condition +
+       n_abstracts_llm + length_abstracts_llm + llm_temperature_llm +
+       records + 
        (1 | dataset),
   REML = FALSE,
   data = simulation
 )
 
 summary(model3)
-anova(model3, model2)
+anova(model3, model2a)
+
 ```
+```{r}
+model4 <- lmer(
+  td ~ condition +
+       n_abstracts_llm + length_abstracts_llm + llm_temperature_llm +
+       (condition | dataset),
+  REML = FALSE,
+  data = simulation
+)
+
+summary(model4)
+anova(model3, model2a)
+
+```
+
+
+
 
 Let's see if the method proposed by Dzaik and applied above is valid by seeing if we get the same regression coefficients when we split the data and run the model only on the llm condition and on the two remaining conditions separately.
 
@@ -228,49 +349,46 @@ fixef(model3)["conditionno_initialisation"]
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+## Comparing to separate linear models (no random effects)
 
 
 
 ```{r}
 
-lm_llm_full_representation <- lm(
-  td ~ condition + 
-       condition * (n_abstracts_llm + length_abstracts_llm + llm_temperature_llm)
+#remove rows with dataset == 'Walker_2018'
+simulation <- simulation %>%
+  filter(dataset != "Walker_2018")
+
+#set condition as factor
+simulation$condition <- as.factor(simulation$condition)
+
+#set 'random' as the reference level
+simulation$condition <- relevel(simulation$condition, ref = "random")
+
+#create new variables for interaction terms
+simulation <- simulation %>%
+  mutate(
+    condition_llm_percent_rel = condition_llm * percent_rel
+  )
+
+# 1) Big two-part model (no random effects)
+lm_big <- lm(
+  td ~ condition +
+       n_abstracts_llm + length_abstracts_llm + llm_temperature_llm +
+      condition_llm_percent_rel +
+      dataset
+    ,
   data = simulation
 )
 
+summary(lm_big)
+
+model.matrix(lm_big)
 ```
 
 
 
-
-
 ```{r}
-# 1) Big two-part model (no random effects)
-lm_big <- lm(
-  td ~ condition +
-       n_abstracts_llm + length_abstracts_llm + llm_temperature_llm,
-  data = simulation
-)
-
 # 2) Separate models
 lm_llm <- lm(
   td ~ n_abstracts + length_abstracts + llm_temperature,
