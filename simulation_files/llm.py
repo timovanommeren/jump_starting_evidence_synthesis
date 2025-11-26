@@ -23,24 +23,24 @@ def prepare_datasets(dataset: pd.DataFrame, name: str, criterium: list, out_dir:
 
     generated_abstracts = generate_abstracts(name=name, stimulus=stimuli, out_dir=out_dir, n_abstracts=n_abstracts, length_abstracts=length_abstracts, typicality=typicality, degree_jargon=degree_jargon, llm_temperature=llm_temperature, run=run)
      
-    # Ensure exactly n_abstracts included and n_abstracts excluded (1:1 ratio)
-    # If not, regenerate up to max_retries times
-    max_retries = 10
-    retry_count = 0
+    # # Ensure exactly n_abstracts included and n_abstracts excluded (1:1 ratio)
+    # # If not, regenerate up to max_retries times
+    # max_retries = 10
+    # retry_count = 0
     
-    n_included = generated_abstracts['label_included'].sum()
-    n_excluded = len(generated_abstracts) - n_included
+    # n_included = generated_abstracts['label_included'].sum()
+    # n_excluded = len(generated_abstracts) - n_included
     
-    while (n_included != n_abstracts or n_excluded != n_abstracts) and retry_count < max_retries:
-        retry_count += 1
-        print(f"Regenerating abstracts for dataset {name} (attempt {retry_count}/{max_retries}): got {n_included} included and {n_excluded} excluded, expected {n_abstracts} of each.")
-        generated_abstracts = generate_abstracts(name=name, stimulus=stimuli, out_dir=out_dir, n_abstracts=n_abstracts, length_abstracts=length_abstracts, typicality=typicality, degree_jargon=degree_jargon, llm_temperature=llm_temperature, run=run)
-        n_included = generated_abstracts['label_included'].sum()
-        n_excluded = len(generated_abstracts) - n_included
+    # while (n_included != n_abstracts or n_excluded != n_abstracts) and retry_count < max_retries:
+    #     retry_count += 1
+    #     print(f"Regenerating abstracts for dataset {name} (attempt {retry_count}/{max_retries}): got {n_included} included and {n_excluded} excluded, expected {n_abstracts} of each.")
+    #     generated_abstracts = generate_abstracts(name=name, stimulus=stimuli, out_dir=out_dir, n_abstracts=n_abstracts, length_abstracts=length_abstracts, typicality=typicality, degree_jargon=degree_jargon, llm_temperature=llm_temperature, run=run)
+    #     n_included = generated_abstracts['label_included'].sum()
+    #     n_excluded = len(generated_abstracts) - n_included
     
 
-    if n_included != n_abstracts or n_excluded != n_abstracts:
-        print(f"WARNING: Dataset {name} failed to generate correct ratio after {max_retries} attempts. Proceeding with {n_included} included and {n_excluded} excluded.")
+    # if n_included != n_abstracts or n_excluded != n_abstracts:
+    #     print(f"WARNING: Dataset {name} failed to generate correct ratio after {max_retries} attempts. Proceeding with {n_included} included and {n_excluded} excluded.")
  
  
     ### APPEND GENERATED ABSTRACTS TO DATASET ##########################################################

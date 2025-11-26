@@ -11,11 +11,11 @@ from metrics import aggregate_recall_plots
 #stimulus_for_llm = ['inclusion_criteria', 'exclusion_criteria']
 
 # Parameters for running simulations
-n_simulations = 10
+n_simulations = 5
 stop_at_n = 100 # set to -1 to stop when all relevant records are found
 
 # Parameters for simulation (IVs)
-n_abstracts = [1, 3, 5, 7, 10]
+n_abstracts = [1, 4, 7]
 length_abstracts = [200, 500, 1000]
 typicality = [0.90]
 degree_jargon = [0.10]
@@ -54,12 +54,12 @@ def run(
     # import all the of the datasets
     datasets = {file.stem: pd.read_csv(file) for file in data_paths}
 
-    # ### Create smaller subset of datasets for testing ####################################################
-    selected_keys = ['Brouwer_2019']
-    subset_datasets = {k: datasets[k] for k in selected_keys if k in datasets}
-    datasets = subset_datasets
+    # # ### Create smaller subset of datasets for testing ####################################################
+    # selected_keys = ['Brouwer_2019']
+    # subset_datasets = {k: datasets[k] for k in selected_keys if k in datasets}
+    # datasets = subset_datasets
     
-    print(f"Running simulations on datasets: {list(datasets.keys())}")
+    # print(f"Running simulations on datasets: {list(datasets.keys())}")
 
     ##########################################################################################################
 
