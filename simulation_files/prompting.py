@@ -7,10 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Load environment variables from .env file
 
-def generate_abstracts(name: str, stimulus: list, out_dir: Path, n_abstracts: int, length_abstracts: int, typicality: float, degree_jargon: float, llm_temperature: float, run: int) -> pd.DataFrame:
-    
-    # transform typicality to list of integers (1 or 0) with the proportion equal to the inputted float value
-    typicality = [1 if i < n_abstracts * typicality else 0 for i in range(n_abstracts)]
+def generate_abstracts(name: str, stimulus: list, out_dir: Path, n_abstracts: int, length_abstracts: int, llm_temperature: float, run: int) -> pd.DataFrame:
     
     ### Create signature ###
     lm = dspy.LM("openai/gpt-4o-mini",
@@ -24,14 +21,14 @@ def generate_abstracts(name: str, stimulus: list, out_dir: Path, n_abstracts: in
     )
 
     class MakeAbstract(dspy.Signature):
-        """Generate a fake abstract based on search terms and whether it should be included or not."""
+        """Generate a synthetic abstract based on the eligibility criteria of the systematic review."""
         
         # Input fields
         label_relevant: int = dspy.InputField(desc="1 for an example of an abstract and title relevant to the review; 0 for an example of an abstract and title irrelevant to the review")
         criteria: str = dspy.InputField(desc="The inclusion or exclusion criteria of the review")
         length_abstracts: int = dspy.InputField(desc="The number of words that the generated abstract should approximately contain.")
-        typicality: int = dspy.InputField(desc="A binary variable representing whether an abstract should be typical (1) or atypical (0) for the review. The typical abstracts generated should be 'in the center' of the relevant or irrelevant cluster of abstracts classified by reviewers, whereas the atypical abstracts should aim to be on the 'edges' of these clusters. In other words, typical abstracts should be more representative of the review topic, whereas atypical abstracts should be more unusual or unique in their content.")
-        degree_jargon: float = dspy.InputField(desc="The degree to which the generated abstracts should exist out of a long list of jargon or rather be written as a true abstract (with 1.00 representing an abstract full of jargon only and 0.00 representing a true abstract)")
+        # typicality: int = dspy.InputField(desc="A binary variable representing whether an abstract should be typical (1) or atypical (0) for the review. The typical abstracts generated should be 'in the center' of the relevant or irrelevant cluster of abstracts classified by reviewers, whereas the atypical abstracts should aim to be on the 'edges' of these clusters. In other words, typical abstracts should be more representative of the review topic, whereas atypical abstracts should be more unusual or unique in their content.")
+        # degree_jargon: float = dspy.InputField(desc="The degree to which the generated abstracts should exist out of a long list of jargon or rather be written as a true abstract (with 1.00 representing an abstract full of jargon only and 0.00 representing a true abstract)")
      
         # Output fields   
         doi: str = dspy.OutputField(desc="Should always be 'None' for generated abstracts")
@@ -58,25 +55,16 @@ def generate_abstracts(name: str, stimulus: list, out_dir: Path, n_abstracts: in
             
             if attempt > 1:
                 print(f"Regenerating abstracts for dataset {name} (attempt {attempt}/{max_attempts}).")
+            attempt += 1
         
             #generate relevant abstract
             relevant = make_abstract(
                 label_relevant=1,
-                criteria = stimulus['inclusion_criteria'],
+                criteria = stimulus['Eligibility criteria'],
                 length_abstracts=length_abstracts,
-                typicality=typicality[i],
-                degree_jargon=degree_jargon
+                llm_temperature=llm_temperature,
             )
 
-            #generate irrelevant abstract
-            irrelevant = make_abstract(
-                label_relevant=0,
-                criteria = stimulus['exclusion_criteria'],
-                length_abstracts=length_abstracts,
-                typicality=typicality[i],
-                degree_jargon=degree_jargon
-            )
-            
             relevant_abstract = {
                 "doi": relevant.doi,
                 "title": relevant.title,
@@ -84,22 +72,13 @@ def generate_abstracts(name: str, stimulus: list, out_dir: Path, n_abstracts: in
                 "label_included": 1,
                 "reasoning": relevant.reasoning,
             }
-            
-            irrelevant_abstract = {
-                "doi": irrelevant.doi,
-                "title": irrelevant.title,
-                "abstract": irrelevant.abstract,
-                "label_included": 0,
-                "reasoning": irrelevant.reasoning,
-            }
         
-    
             parsed_data = {
-                "doi": [relevant_abstract["doi"], irrelevant_abstract["doi"]],
-                "title": [relevant_abstract["title"], irrelevant_abstract["title"]],
-                "abstract": [relevant_abstract["abstract"], irrelevant_abstract["abstract"]],
-                "label_included": [relevant_abstract["label_included"], irrelevant_abstract["label_included"]],
-                "reasoning": [relevant_abstract["reasoning"], irrelevant_abstract["reasoning"]],
+                "doi": [relevant_abstract["doi"]],
+                "title": [relevant_abstract["title"]],
+                "abstract": [relevant_abstract["abstract"]],
+                "label_included": [relevant_abstract["label_included"]],
+                "reasoning": [relevant_abstract["reasoning"]],
             }
             
             # try to append generated abstracts to dataframe
@@ -108,13 +87,13 @@ def generate_abstracts(name: str, stimulus: list, out_dir: Path, n_abstracts: in
             success = True
             break # exit the attempt loop if successful
         
-            attempt += 1
+
     
     #ensure that the label is of the generated abstracts is integer
     df_generated = df_generated.astype({"label_included":int})
        
     #save generated abstracts to csv file in new directory
-    path_abstracts = out_dir / name / f"llm_abstracts/llm_abstracts_run_{run}_IVs_{n_abstracts}_{length_abstracts}_{typicality}_{degree_jargon}_{llm_temperature}.csv"
+    path_abstracts = out_dir / name / f"llm_abstracts/llm_abstracts_run_{run}_IVs_{n_abstracts}_{length_abstracts}_{llm_temperature}.csv"
     path_abstracts.parent.mkdir(parents=True, exist_ok=True)
     df_generated.to_csv(path_abstracts, index=False)
 

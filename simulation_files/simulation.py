@@ -9,13 +9,13 @@ from asreview.models.queriers import Random, Max
 from asreview.models.stoppers import IsFittable
 from asreview.models.stoppers import NLabeled
 
-from priors import sample_priors
-from llm import prepare_datasets
+from priors_only_inclusion import sample_priors
+from llm_only_inclusion import prepare_datasets
 from metrics import evaluate_simulation
 
 
 
-def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.ExcelFile, n_abstracts: int, length_abstracts: int, typicality: float, degree_jargon: float, llm_temperature: float, wss_threshold: float, tdd_threshold: int, seed: int, run: int, stop_at_n: int) -> dict:
+def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.ExcelFile, n_abstracts: int, length_abstracts: int, llm_temperature: float, wss_threshold: float, tdd_threshold: int, run: int, stop_at_n: int) -> dict:
 
     for dataset_names in datasets.keys():
         
@@ -26,10 +26,10 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
         
         # Generate LLM priors and add them to dataset
         print(f"Generating LLM priors for dataset: {dataset_names}")
-        dataset_llm, dataset_criteria = prepare_datasets(datasets[dataset_names], name=dataset_names, criterium=criterium, out_dir=out_dir, metadata=metadata, n_abstracts=n_abstracts, length_abstracts=length_abstracts, typicality=typicality, degree_jargon=degree_jargon, llm_temperature=llm_temperature, run=run) # Generate abstracts and add them to datasets
+        dataset_llm, dataset_criteria = prepare_datasets(datasets[dataset_names], name=dataset_names, criterium=criterium, out_dir=out_dir, metadata=metadata, n_abstracts=n_abstracts, length_abstracts=length_abstracts, llm_temperature=llm_temperature, run=run) # Generate abstracts and add them to datasets
 
         # Sample priors for random initialization condition
-        prior_idx = sample_priors(datasets[dataset_names], seed = seed) 
+        prior_idx = sample_priors(datasets[dataset_names], seed = run) 
 
         ###############################################################################################################
         
@@ -46,26 +46,16 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
         "min_df": 1,
         }
 
-        alc_no_prior = [
+        alc = [
             asreview.ActiveLearningCycle(
-                querier=Random(random_state=seed), 
+                querier=Random(random_state=run), 
                 stopper=IsFittable()),
             asreview.ActiveLearningCycle(
                 querier=Max(),
-                classifier=SVM(C=0.11, loss="squared_hinge", random_state=seed),
+                classifier=SVM(C=0.11, loss="squared_hinge", random_state=run),
                 balancer=Balanced(ratio=9.8),
                 feature_extractor=Tfidf(**tfidf_kwargs),
                 stopper=NLabeled(stop_at_n)
-            )
-        ]
-
-        alc = [
-            asreview.ActiveLearningCycle(
-                querier=Max(),
-                classifier=SVM(C=0.11, loss="squared_hinge", random_state=seed),
-                balancer=Balanced(ratio=9.8),  
-                feature_extractor=Tfidf(**tfidf_kwargs),
-                stopper=NLabeled(stop_at_n if stop_at_n == -1 else stop_at_n + 2 * n_abstracts) # account for added LLM priors
             )
         ]
         
@@ -80,29 +70,31 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
 
         print(f"Running simulations for dataset: {dataset_names}")
 
-        # Run simulation with random initialization (one relevant and one irrelevant prior)
-        simulate_random = asreview.Simulate(X=datasets[dataset_names], labels=datasets[dataset_names]["label_included"], cycles=alc)
-        simulate_random.label(prior_idx)
-        simulate_random.review()
-
+        print(prior_idx)
+        
         # Run simulation with LLM priors
         simulate_llm = asreview.Simulate(X=dataset_llm['dataset'], labels=dataset_llm['dataset']["label_included"], cycles=alc)
         simulate_llm.label(dataset_llm['prior_idx'])
         simulate_llm.review()
-        
+
         # Run simulation with criteria as priors
         simulate_criteria = asreview.Simulate(X=dataset_criteria['dataset'], labels=dataset_criteria['dataset']["label_included"], cycles=alc)
         simulate_criteria.label(dataset_criteria['prior_idx'])
         simulate_criteria.review()
 
         # Run simulation without priors (random start)
-        simulate_no_initialisation = asreview.Simulate(X=datasets[dataset_names], labels=datasets[dataset_names]["label_included"], cycles=alc_no_prior)
+        simulate_no_initialisation = asreview.Simulate(X=datasets[dataset_names], labels=datasets[dataset_names]["label_included"], cycles=alc)
         simulate_no_initialisation.review()
         
+        # Run simulation with random initialization (one relevant and one irrelevant prior)
+        simulate_random = asreview.Simulate(X=datasets[dataset_names], labels=datasets[dataset_names]["label_included"], cycles=alc)
+        simulate_random.label([prior_idx])
+        simulate_random.review()
+        
         ###############################################################################################################
-        
-        
-        
+    
+    
+    
         
         
         ### SAVE SIMULATION RESULTS ####################################################################################
@@ -113,7 +105,7 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
         
         #save all results to csv files
         for sim, condition in zip([simulate_random, simulate_llm, simulate_criteria, simulate_no_initialisation], ['random', 'llm', 'criteria', 'no_initialisation']):
-            sim._results.to_csv(raw_sim_dir / f'{condition}_run_{run}_IVs_{n_abstracts}_{length_abstracts}_{typicality}_{degree_jargon}_{llm_temperature}.csv', index=False)
+            sim._results.to_csv(raw_sim_dir / f'{condition}_run_{run}_IVs_{n_abstracts}_{length_abstracts}_{llm_temperature}.csv', index=False)
         
         # This line drops priors. To access the dataframe before this, just use simulate._results
         df_results_random = simulate_random._results.dropna(axis=0, subset="training_set")
@@ -144,12 +136,9 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
                             prior_idx, 
                             n_abstracts=n_abstracts, 
                             length_abstracts=length_abstracts, 
-                            typicality=typicality, 
-                            degree_jargon=degree_jargon, 
                             llm_temperature=llm_temperature, 
                             wss_threshold=wss_threshold, 
                             tdd_threshold=tdd_threshold, 
-                            seed=seed, 
                             out_dir=out_dir, 
                             run=run, 
                             stop_at_n=stop_at_n)

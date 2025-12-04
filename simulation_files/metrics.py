@@ -13,19 +13,19 @@ from asreviewcontrib.insights import algorithms
 from asreviewcontrib.insights import metrics
 
 
-def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset_llms: pd.DataFrame, dataset_criteria: pd.DataFrame, prior_idx: list, n_abstracts: int, length_abstracts: int, typicality: float, degree_jargon: float, llm_temperature: float, wss_threshold: float, tdd_threshold: int, seed: int, out_dir: Path, run: int, stop_at_n: int) -> None:
+def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset_llms: pd.DataFrame, dataset_criteria: pd.DataFrame, prior_idx: list, n_abstracts: int, length_abstracts: int, llm_temperature: float, wss_threshold: float, tdd_threshold: int, out_dir: Path, run: int, stop_at_n: int) -> None:
 
     ### PREPARE DATA FOR EVALUATION ############################################################################################################
 
     (dataset_names, simulation_results), = simulation_results.items() # comma enforces unpacking single item (since were doing only one dataset at a time)
 
     # pad the labels to ensure accurate simulation results (see Report section 4.2.1)
-    padded_labels_random = pad_labels(simulation_results['random']["label"].reset_index(drop=True), len(prior_idx), len(dataset), stop_at_n)
+    padded_labels_random = pad_labels(simulation_results['random']["label"].reset_index(drop=True), len([prior_idx]), len(dataset), stop_at_n)
     padded_labels_llm = pad_labels(simulation_results['llm']["label"].reset_index(drop=True), 0, len(dataset_llms['dataset']), stop_at_n) # note that in the llm condition, the priors aren't part of the analyzed set so should not be considered in padding
     padded_labels_criteria = pad_labels(simulation_results['criteria']["label"].reset_index(drop=True), 0, len(dataset_criteria['dataset']), stop_at_n) # idem for criteria condition
     padded_labels_no_initialisation = pad_labels(simulation_results['no_initialisation']["label"].reset_index(drop=True), 0, len(dataset), stop_at_n)
 
-    # concatenate the three cumulative sum results in one dataframe for adding metadata and plotting
+    # concatenate the three cumulative sum results in one dataframe for adding metadata and plottingq
     df_cumsum = pd.DataFrame({
         'Random Initialization': padded_labels_random.cumsum(),
         'LLM Initialization': padded_labels_llm.cumsum(),
@@ -46,8 +46,6 @@ def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset
         dataset_names=dataset_names,
         n_abstracts=n_abstracts,
         length_abstracts=length_abstracts,
-        typicality=typicality,
-        degree_jargon=degree_jargon,
         llm_temperature=llm_temperature,
         out_dir=out_dir,
         run=run,
@@ -118,13 +116,13 @@ def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset
     results_row = []
 
     for condition, metrics_dict in [
-        ('random', {'nrr': nrr_random, 'ndcg': ndcg_score_random, 'td': td_random, 
+        ('random', {'nrr': nrr_random, 'ndcg': ndcg_score_random, 'papers_found': td_random, 
                     'atd': atd_random, 'wss': wss_random}),
-        ('llm', {'nrr': nrr_llm, 'ndcg': ndcg_score_llm, 'td': td_llm,
+        ('llm', {'nrr': nrr_llm, 'ndcg': ndcg_score_llm, 'papers_found': td_llm,
                 'atd': atd_llm, 'wss': wss_llm}),
-        ('criteria', {'nrr': nrr_criteria, 'ndcg': ndcg_score_criteria, 'td': td_criteria,
+        ('criteria', {'nrr': nrr_criteria, 'ndcg': ndcg_score_criteria, 'papers_found': td_criteria,
                       'atd': atd_criteria, 'wss': wss_criteria}),
-        ('no_initialisation', {'nrr': nrr_no_initialisation, 'ndcg': ndcg_score_no_initialisation, 'td': td_no_initialisation,
+        ('no_initialisation', {'nrr': nrr_no_initialisation, 'ndcg': ndcg_score_no_initialisation, 'papers_found': td_no_initialisation,
                     'atd': atd_no_initialisation, 'wss': wss_no_initialisation})
     ]:
         for metric_name, metric_value in metrics_dict.items():
@@ -139,13 +137,10 @@ def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset
                 'value': metric_value,
                 'n_abstracts': n_abstracts if is_llm else np.nan,
                 'length_abstracts': length_abstracts if is_llm else np.nan,
-                'typicality': typicality if is_llm else np.nan,
-                'degree_jargon': degree_jargon if is_llm else np.nan,
                 'llm_temperature': llm_temperature if is_llm else np.nan,
                 'tdd@': tdd_threshold,
                 'wss@': wss_threshold,
                 'timestamp': pd.Timestamp.now().isoformat(),
-                'seed': seed,  # Reproducibility
                 'run': run,  # replicate ID
             })
             
@@ -193,7 +188,7 @@ def tdd_at(results, threshold):
 
 
 
-def recall_plot(df_cumsum: pd.DataFrame, dataset_names: str, n_abstracts: int, length_abstracts: int, typicality: float, degree_jargon: float, llm_temperature: float, out_dir: Path, run: int, stop_at_n: int):
+def recall_plot(df_cumsum: pd.DataFrame, dataset_names: str, n_abstracts: int, length_abstracts: int, llm_temperature: float, out_dir: Path, run: int, stop_at_n: int):
     
     plt.figure(figsize=(10, 6))
 
@@ -220,7 +215,7 @@ def recall_plot(df_cumsum: pd.DataFrame, dataset_names: str, n_abstracts: int, l
     recalls_folder.mkdir(parents=True, exist_ok=True)
     
     # save plot to output_path
-    plot_path = recalls_folder / f'recall_plot_run_{run}_IVs_{n_abstracts}_{length_abstracts}_{typicality}_{degree_jargon}_{llm_temperature}.png'
+    plot_path = recalls_folder / f'recall_plot_run_{run}_IVs_{n_abstracts}_{length_abstracts}_{llm_temperature}.png'
     plt.savefig(plot_path)
     plt.close()
 
