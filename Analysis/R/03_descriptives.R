@@ -1,177 +1,183 @@
 descriptive_tables <- function(data) {
-  
-  #Summary by condition
+
+  #Summary of number of papers found by condition
   desc_by_cond <- data %>%
     group_by(condition) %>%
     summarise(
-      td_mean = mean(td),
-      td_sd   = sd(td),
+      papers_found_mean = mean(papers_found),
+      papers_found_sd   = sd(papers_found),
       n       = n(),
       .groups = "drop"
     )
-  
+
+  #Summary of
+
   # Return results as a list
   list(by_condition = desc_by_cond)
 }
 
-descriptive_barchart <- function(data, metadata) {
-  
-  # Step 1: mean per dataset x condition (to compute contrast) 
-  means <- data %>% 
-    group_by(dataset, condition) %>% 
-    summarise(mean_value = mean(td), .groups = "drop") %>% 
-    pivot_wider(names_from = condition, values_from = mean_value) %>% 
-    mutate(contrast = .data[["llm"]] - .data[["no_initialisation"]]) %>% 
-    select(dataset, contrast) 
-  
-  # Step 2: join contrast back to full data 
-  data_with_contrast <- data %>% left_join(means, by = "dataset") 
-  
-  # Step 3: compute mean and SE per dataset x condition 
-  plot_data <- data_with_contrast %>% 
-    group_by(dataset, condition, contrast) %>% 
-    summarise( 
-      n = n(), 
-      td_mean = mean(td), 
-      td_se = sd(td) / sqrt(n),
-      .groups = "drop" 
-    ) %>% 
-    tidyr::replace_na(list(td_se = 0)) 
-  
-  # if only 1 obs, sd = NA → set SE to 0 # Join % to your plot_data and set the x-order by percent_rel (descending = highest % first) 
-  plot_data <- plot_data %>% 
-    left_join(metadata %>% select(dataset, percent_rel), by = c("dataset" = "dataset")) %>% 
-    mutate(dataset = fct_reorder( 
-      paste0(dataset, " (", percent_rel, "%)"), 
-      percent_rel, .desc = TRUE))
-  
+
+
+descriptive_barchart <- function(data, metadata, variable) {
+
+  means <- data %>%
+    group_by(dataset, condition) %>%
+    summarise(
+      mean_value = mean({{ variable }}),
+      .groups = "drop"
+    ) %>%
+    pivot_wider(names_from = condition, values_from = mean_value) %>%
+    mutate(contrast = .data[["llm"]] - .data[["no_initialisation"]]) %>%
+    select(dataset, contrast)
+
+  data_with_contrast <- data %>% left_join(means, by = "dataset")
+
+  plot_data <- data_with_contrast %>%
+    group_by(dataset, condition, contrast) %>%
+    summarise(
+      n = n(),
+      variable_mean = mean({{ variable }}),
+      variable_se   = sd({{ variable }}) / sqrt(n),
+      .groups = "drop"
+    ) %>%
+    tidyr::replace_na(list(variable_se = 0))
+
+  plot_data <- plot_data %>%
+    left_join(metadata %>% select(dataset, percent_rel), by = "dataset") %>%
+    mutate(dataset = fct_reorder(
+      paste0(dataset, " (", percent_rel, "%)"),
+      percent_rel, .desc = TRUE
+    ))
+
   plot <- ggplot(
     plot_data,
     aes(x = dataset,
-        y = td_mean,
+        y = variable_mean,
         fill = factor(condition))
   ) +
     geom_col(position = position_dodge(width = 0.8), width = 0.7) +
-    geom_errorbar(aes(ymin = td_mean - td_se, ymax = td_mean + td_se),
-                  position = position_dodge(width = 0.8), width = 0.2) +
+    geom_errorbar(
+      aes(ymin = variable_mean - variable_se,
+          ymax = variable_mean + variable_se),
+      position = position_dodge(width = 0.8),
+      width = 0.2
+    ) +
     geom_hline(yintercept = 100,
                linetype = "dashed",
                color = "black",
                linewidth = 0.4) +
     labs(
       title = "",
-      x = "Datasets <span style='color:#888888;'>(ordered by percent_rel of relevant records)</span>", 
-      y = "Number of relevant records",
-      fill = "Examples given before screening:"             
+      x = "Datasets <span style='color:#888888;'>(ordered by percent_rel of relevant records)</span>",
+      y = "Number of relevant records",  # you could parameterise this too
+      fill = "Examples given before screening:"
     ) +
-    scale_fill_manual(                      
+    scale_fill_manual(
       values = c(
-        llm       = "chartreuse3",
-        random   = "blue",
+        llm             = "chartreuse3",
+        random          = "blue",
+        criteria        = "orange",
         no_initialisation = "red"
-        
       ),
-      breaks = c("llm", "random", "no_initialisation"),
-      labels = c("LLM-generated", "True examples", "None")
+      breaks = c("llm", "random", "criteria", "no_initialisation"),
+      labels = c("LLM-generated", "True examples", "Eligibility criteria","None")
     ) +
     theme_minimal() +
     theme(
-      plot.title = element_text(hjust = 0.5, face = "bold"),
-      axis.title.x = element_markdown(),  # enables HTML styling for x label
-      axis.title.y = element_markdown(),   # enables HTML styling for y label
+      plot.title       = element_text(hjust = 0.5, face = "bold"),
+      axis.title.x     = element_markdown(),
+      axis.title.y     = element_markdown(),
       panel.background = element_rect(fill = "white", color = NA),
       plot.background  = element_rect(fill = "white", color = NA),
-      legend.background = element_rect(fill = "white", color = NA),
-      legend.key = element_rect(fill = "white", color = NA),
-      plot.margin = margin(10, 20, 10, 10),
-      axis.text.x = element_text(angle = 55, hjust = 1),
-      legend.position = "top"               # optional
+      legend.background= element_rect(fill = "white", color = NA),
+      legend.key       = element_rect(fill = "white", color = NA),
+      plot.margin      = margin(10, 20, 10, 10),
+      axis.text.x      = element_text(angle = 55, hjust = 1),
+      legend.position  = "top"
     )
-  
-  ggsave(
-    filename = here::here("Report/results/td_barchart.png"),
-    plot = plot,
-    width = 10,                 # width in inches
-    height = 6,                 # height in inches
-    dpi = 300                   # resolution (300 is print-quality)
-  )
-  
-  return(plot)
 
+  ggsave(
+    filename = here::here("Report/results/papers_found_barchart.png"),
+    plot = plot,
+    width = 10,
+    height = 6,
+    dpi = 300
+  )
+
+  plot
 }
 
 
 
-
 plots_llm_vs_no_init_conditions <- function(simulation, dataset_name) {
-  
+
   library(ggdist)
-  
-  diff <- simulation %>% 
-    filter(dataset == dataset_name) %>% 
-    select(run, condition, td) %>%
+
+  diff <- simulation %>%
+    filter(dataset == dataset_name) %>%
+    select(run, condition, papers_found) %>%
     mutate(diff_llm_no = llm - no_priors)
-  
-  
+
+
   ggplot(diff, aes(x = diff_llm_no)) +
     geom_histogram(aes(y = ..density..), bins = 10, alpha = 0.6) +
     geom_density(linewidth = 0.8) +
     labs(
-      x = "td_llm − td_no_priors (per run)",
+      x = "papers_found_llm − papers_found_no_priors (per run)",
       y = "Density",
-      title = paste("Distribution of td difference (LLM vs no priors) – ", dataset_name)
+      title = paste("Distribution of papers_found difference (LLM vs no priors) – ", dataset_name)
     )
-  
+
   ggplot(diff, aes(x = diff_llm_no)) +
     stat_ecdf(linewidth = 0.8) +
     labs(
-      x = "td_llm − td_no_priors",
+      x = "papers_found_llm − papers_found_no_priors",
       y = "Empirical CDF",
-      title = paste("ECDF of td difference – ", dataset_name)
+      title = paste("ECDF of papers_found difference – ", dataset_name)
     )
-  
+
   ggplot(diff, aes(x = "", y = diff_llm_no)) +
     geom_boxplot(width = 0.2, outlier.shape = NA) +
     geom_jitter(width = 0.05, height = 0, alpha = 0.6) +
     labs(
       x = NULL,
-      y = "td_llm − td_no_priors",
-      title = paste("Run-wise differences in td – ", dataset_name)
+      y = "papers_found_llm − papers_found_no_priors",
+      title = paste("Run-wise differences in papers_found – ", dataset_name)
     ) +
     theme(axis.text.x = element_blank())
-  
+
   ggplot(diff, aes(x = "", y = diff_llm_no)) +
     geom_violin(trim = FALSE, alpha = 0.6) +
     geom_jitter(width = 0.05, height = 0, alpha = 0.6) +
-    labs(x = NULL, y = "td_llm − td_no_priors")
-  
-  
+    labs(x = NULL, y = "papers_found_llm − papers_found_no_priors")
+
+
   ggplot(diff, aes(sample = diff_llm_no)) +
     stat_qq() +
     stat_qq_line() +
     labs(
-      title = paste("QQ plot of td difference – ", dataset_name),
+      title = paste("QQ plot of papers_found difference – ", dataset_name),
       x = "Theoretical quantiles",
       y = "Sample quantiles"
     )
-  
+
   ggplot(diff, aes(x = diff_llm_no, y = 1)) +
     stat_halfeye(point_interval = median_qi) +
     labs(
-      x = "td_llm − td_no_priors",
+      x = "papers_found_llm − papers_found_no_priors",
       y = NULL,
-      title = paste("Sampling distribution of td difference – ", dataset_name)
+      title = paste("Sampling distribution of papers_found difference – ", dataset_name)
     ) +
     theme(axis.text.y = element_blank())
-  
-  
+
+
 }
 
 
 
 # ggplot(
 #   subset(simulation, !dataset %in% c("Walker_2018", "Brouwer_2019")),
-#   aes(x = records, y = td)) +
+#   aes(x = records, y = papers_found)) +
 #   geom_point(alpha = 0.6) +
 #   geom_smooth(method = "lm",
 #               aes(color = "linear"),

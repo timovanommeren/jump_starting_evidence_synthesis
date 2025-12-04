@@ -1,5 +1,5 @@
 ---
-title: "TDD_100"
+title: "papers_foundD_100"
 output: html_document
 date: "2025-10-28"
 ---
@@ -22,18 +22,21 @@ load_packages()
 ```{r load and transform data}
 
 # import simulation results and metadata (specify paths relative to project root)
-raw <- load_simulation_data(data = "simulation_results/adding_NAs/all_simulation_results.csv", 
+raw <- load_simulation_data(data = "simulation_results/inclusion_only/all_simulation_results.csv", 
                              metadata = "Analysis/percentage_relevant.csv")
 
 # (1) transform simulation data to wide
-# (2) adjust metadata column names, and, 
-# (3) add the number of records and percent_rel of relevant records from metadata to simulation data (these will serve as group-level predictors in multilevel model)
+# (2) add the number of records, percentage of relevant records and dataset topic(s) from metadata to simulation data (these will serve as group-level predictors in multilevel model)
+# (4) rescale n_abstracts (divide by 100) and length_abstracts (divide by 1000)
+# (5) truncate topic names to first topic only
 processed <- prepare_data(raw$simulation, raw$meta)
 
 # assign to variables for easier access
 simulation_long <- raw$simulation
 simulation      <- processed$simulation
 metadata        <- processed$meta
+
+colnames(simulation)[colnames(simulation) == 'papers_found'] <- 'papers_found'
 
 ```
 
@@ -46,9 +49,16 @@ metadata        <- processed$meta
 head(simulation)
 summary(simulation)
 
-#export summary data to latex format text file 
+#export summary data to latex format text file ???
 ```
 
+
+
+
+
+### Centering predictors
+
+Let's start by centering the llm-specific predictors within the llm condition, and setting them to 0 in the other conditions (two-part coding). This way, the coefficients for the condition factor will represent the difference in papers_found between the llm condition (when llm parameters are at their mean) and the other conditions.
 
 ```{r}
 
@@ -59,17 +69,17 @@ simulation <- simulation %>%
     llm_active = (condition == "llm"),
 
     # set to 0 if not llm condition (two-part coding)
-    n_abstracts = ifelse(
+    n_abstracts_llm = ifelse(
       llm_active,
       n_abstracts - mean(n_abstracts[llm_active], na.rm = TRUE),
       0
     ),
-    length_abstracts = ifelse(
+    length_abstracts_llm = ifelse(
       llm_active,
       length_abstracts  - mean(length_abstracts[llm_active], na.rm = TRUE),
       0
     ),
-    llm_temperature = ifelse(
+    llm_temperature_llm = ifelse(
       llm_active,
       llm_temperature - mean(llm_temperature[llm_active], na.rm = TRUE),
       0
@@ -78,13 +88,14 @@ simulation <- simulation %>%
 
 ```
 
+
 ### Descriptive plots
 
 #### Bar chart of number of relevant records found per dataset and condition
 
 ```{r}
 
-descriptive_barchart(simulation, metadata)
+descriptive_barchart(simulation, metadata, recall_at_100)
 
 ```
 
@@ -96,16 +107,22 @@ descriptive_barchart(simulation, metadata)
 
 ```{r}
 #check the assumption of homogeneity of variance across conditions
-ggplot(simulation, aes(x = condition, y = td)) +
+ggplot(simulation, aes(x = condition, y = papers_found)) +
   geom_boxplot() +
   geom_jitter(width = 0.1, alpha = .3)
-```
 
+#calculate Levene's test for homogeneity of variance
+car::leveneTest(papers_found ~ condition, data = simulation) # not significant, so homogeneity of variance assumption met
+
+```
+There seems to be little variance in the 'criteria' condition within datasets. This makes sense since the other three conditions have additional sources of randomness (llm: LLM outputs, no_initialisation and random: random sampling). The 'criteria' condition always starts with the same two relevant records (the criteria), which likely leads to more similar performance across runs. So, even though Levene's test indicates that the homogeneity of variance assumption is met, the visualization suggests that there may be some heterogeneity of variance specifically between the criteria condition and the other conditions. Thus this comparison should be interpreted with caution.
+
+Variance across runs in the other conditions is due to variation in priors, not to model stochasticity.
 
 ```{r, run=FALSE}}
 # check the assumption of linearity between percentage and relevant records found
 ggplot(simulation,
-       aes(x = percent_rel, y = td)) +
+       aes(x = percent_rel, y = papers_found)) +
   geom_point(alpha = 0.6) +
   geom_smooth(method = "lm",
               aes(color = "linear"),
@@ -131,7 +148,7 @@ ggplot(simulation,
 
 # check the assumption of linearity between percentage and relevant records found
 ggplot(simulation,
-       aes(x = records, y = td)) +
+       aes(x = records, y = papers_found)) +
   geom_point(alpha = 0.6) +
   geom_smooth(method = "lm",
               aes(color = "linear"),
@@ -159,11 +176,11 @@ ggplot(simulation,
 
 
 
-### Mixed effects model
+# Mixed effects model
 
-A bottom-up modeling approach is used to build the mixed effects model. We start with an intercept-only model and subsequently add fixed effects and random slopes. At each step, we evaluate whether the addition of parameters significantly improves model fit using likelihood ratio tests.
+A bottom-up modeling approach is used to build the mixed effects model. We start with an intercept-only model and subsequently add fixed effects and random slopes. At each step, we evaluate whether the addition of parameters significantly improves model fit using likelihood ratio tests
 
-####
+###
 
 ```{r}
 #set reference category for regression model
@@ -172,10 +189,10 @@ simulation <- simulation %>% mutate(condition = relevel(factor(condition), ref =
 
 
 
-#### Intercept only model
+### Intercept only model
 
 ```{r}
-model0 <- lmer(td ~ 1 + (1|dataset), REML = F, data = simulation)
+model0 <- lmer(papers_found ~ 1 + (1|dataset), REML = F, data = simulation)
 summary(model0)
 ```
 
@@ -187,10 +204,37 @@ ICC = Intercept_variances[Intercept_variances$grp == 'dataset','vcov'] / (Interc
 print(ICC)
 ```
 
+<!-- #### Grand mean centering -->
+
+<!-- Let's see how grand mean centering affects the results. Grand mean centering involves subtracting the overall mean of a predictor from each individual value of that predictor. This transformation can help in interpreting the intercept and can also reduce multicollinearity among predictors. -->
+
+<!-- ```{r} -->
+<!-- #grand mean center the dataset level predictors -->
+<!-- simulation_centered <- simulation %>% -->
+<!--   mutate( -->
+<!--     percent_rel_centered = percent_rel - mean(percent_rel, na.rm = TRUE), -->
+<!--     records_centered = records - mean(records, na.rm = TRUE) -->
+<!--   ) -->
+<!-- ``` -->
+
+
+<!-- Now, we'll run two models - one grand mean centered and the other not - to see if centering makes a difference in the results. -->
+
+<!-- ```{r} -->
+
+<!-- model_centered <- lmer(papers_found ~ percent_rel_centered + records_centered + (1|dataset), REML = F, data = simulation_centered) -->
+<!-- summary(model_centered) -->
+
+<!-- model_not_centered <- lmer(papers_found ~ percent_rel + records + (1|dataset), REML = F, data = simulation) -->
+<!-- summary(model_not_centered) -->
+<!-- ``` -->
+
+<!-- The random variance components of the two models  -->
+
 
 ```{r}
 
-model1 <- lmer(td ~ condition  + (1|dataset), REML = F, data = simulation)
+model1 <- lmer(papers_found ~ condition  + (1|dataset), REML = F, data = simulation)
 summary(model1)
 anova(model1, model0)
 ```
@@ -200,7 +244,7 @@ anova(model1, model0)
 
 ```{r}
 
-model2 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + (1|dataset), REML = F, data = simulation)
+model2 <- lmer(papers_found ~ condition + n_abstracts_llm + length_abstracts_llm + llm_temperature_llm + (1|dataset), REML = F, data = simulation)
 summary(model2)
 anova(model2, model1)
 ```
@@ -209,13 +253,13 @@ anova(model2, model1)
 15742    
 
 ```{r}
-model3 <- lmer(td ~ condition + records + percent_rel + (1|dataset), REML = F, data = simulation)
+model3 <- lmer(papers_found ~ condition + percent_rel + (1|dataset), REML = F, data = simulation)
 summary(model3)
-anova(model3, model2)
+anova(model3, model1)
 ```
 
 ```{r}
-model4 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + records + percent_rel + (condition|dataset), REML = F, data = simulation)
+model4 <- lmer(papers_found ~ condition + percent_rel + (condition|dataset), REML = F, data = simulation)
 summary(model4)
 anova(model4, model3)
 ```
@@ -223,7 +267,7 @@ anova(model4, model3)
 The negative correlations between the random intercepts and random slopes indicate that in datasets where performance under the reference condition (LLM) is higher than average, the drop in performance when using minimal or no_priors instead of LLM is larger than average. In other words, the effect of initialization was more pronounced for datasets where the overall performance was higher in general. Some datasets are simply easier for the active learning model of ASReview: many relevant records can be found early. In those ‘easier’ datasets, LLM-based initialization tends to create an especially large advantage over minimal or no_priors, which is reflected in the strong negative correlations between the random intercept and the random slopes.
 
 ```{r}
-model5 <- lmer(td ~ condition + n_abstracts + length_abstracts + llm_temperature + records + percent_rel + condition*percent_rel + (condition|dataset), REML = F, data = simulation)
+model5 <- lmer(papers_found ~ condition + percent_rel + condition*records + (condition|dataset), REML = F, data = simulation)
 summary(model5)
 anova(model5, model4)
 ```
@@ -244,10 +288,74 @@ qqnorm(ranef(model5)$dataset[,2])
 qqnorm(ranef(model5)$dataset[,3])
 ```
 
+The residuals and random effects do not seem to be normally distributed. 
 
 
-## Exporting Results
+### Is number of relevant records found a limited measure of starting performance?
 
+```{r}
+# calculate recall at 100 for each run
+simulation <- simulation %>%
+  mutate(
+    recall_at_100 = papers_found / included * 100
+  )
+
+#the percentage of runs which have perfect recall
+percent_perfect_recall <- simulation %>%
+  group_by(condition) %>%
+  summarise(
+    percent_perfect_recall = mean(recall_at_100 == 100) * 100
+  )
+percent_perfect_recall
+
+#calculate variation in recall at 100 per condition
+variation_recall <- simulation %>%
+  group_by(condition) %>%
+  summarise(
+    sd_recall_at_100 = sd(recall_at_100)
+  )
+variation_recall
+
+#join the two tables
+recall_summary <- percent_perfect_recall %>%
+  left_join(variation_recall, by = "condition")
+
+recall_summary
+```
+
+
+
+# Exporting data and results
+
+# Descriptives
+
+```{r}
+#export descriptive statistics table to latex format text file
+writeLines(capture.output(descriptive_tables(simulation)), here::here("Report/results/descriptives_table.tex"))
+
+descriptive_tables(simulation)
+```
+
+## Perfect recall percentages per condition in text
+
+```{r}
+perfect_recall_text <- paste0(
+  "all relevant records were found within the first 100 records screened, in ", round(percent_perfect_recall$percent_perfect_recall[percent_perfect_recall$condition == "llm"],2),
+  "\\% of the runs in the LLM-initialization condition. ",
+  "In the random-initialization condition, this was ", round(percent_perfect_recall$percent_perfect_recall[percent_perfect_recall$condition == "random"],2),
+  "\\%, in the criteria condition, ", round(percent_perfect_recall$percent_perfect_recall[percent_perfect_recall$condition == "criteria"],2),
+  "\\%, and in the no-initialization condition, ", round(percent_perfect_recall$percent_perfect_recall[percent_perfect_recall$condition == "no_initialisation"],2),
+  "\\%."
+)
+
+# ---- Print LaTeX to console (or write to a .tex file)
+cat(perfect_recall_text)
+writeLines(perfect_recall_text, here::here("Report/results/perfect_recall_text.tex"))
+
+```
+
+
+## Model results
 
 ```{r}
 

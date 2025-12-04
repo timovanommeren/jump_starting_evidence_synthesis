@@ -7,8 +7,8 @@ from metrics import aggregate_recall_plots
 
 stop_at_n = 100 
 
-in_dir = Path(r"C:\Users\timov\Desktop\Utrecht\Utrecht\MSBBSS\thesis_timo\Synergy\synergy_dataset")
-out_dir = Path(r'C:\Users\timov\Desktop\Utrecht\Utrecht\MSBBSS\thesis_timo\simulations\users_meeting')
+in_dir = Path(r"C:\\Users\\timov\\Desktop\\Utrecht\\Utrecht\\MSBBSS\\thesis_timo\\Synergy\\synergy_dataset")
+out_dir = Path(r'C:\\Users\\timov\\Desktop\\Utrecht\\Utrecht\\MSBBSS\\thesis_timo\\simulation_results\\inclusion_only')
 
 # import the paths of all files in the input directory
 data_paths = [f for f in Path(in_dir).iterdir() if f.is_file()]
