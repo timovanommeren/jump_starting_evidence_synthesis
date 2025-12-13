@@ -29,6 +29,9 @@ Report/*
 !Report/results_paragraph.tex
 !Report/references.bib
 
+!Report/midterm_report.tex
+!Report/midterm_report.pdf
+
 # folders to keep
 !Report/vector_space/
 !Report/results/

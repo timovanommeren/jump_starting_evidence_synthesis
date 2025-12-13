@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "JUMP STARTING EVIDENCE SYNTHESIS"
+type: 
+version: 0.1.0
+date-released: 2025-12-13
+url: "https://github.com/timovanommeren/jump_starting_evidence_synthesis"
+
+authors:
+  - family-names: "van Ommeren"
+    given-names: "Timo Q."
+    orcid: "https://orcid.org/0009-0001-5785-9268"
+    affiliation: "Utrecht University"
+
+license: "MIT"
+keywords:
+  - systematic reviews
+  - ASReview
+  - large language models
