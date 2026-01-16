@@ -12,7 +12,11 @@ simulations/output_study_100_runs_tdd/
 notebooks/
 Mini_thesis.pdf
 makita_simulations/
+Inclusion_criteria/
 
+# main statistical analysis only
+Analysis/analysis/*
+!Analysis/analysis/main_analysis.rmd
 
 # remove the results of simulations
 simulation_results/*
@@ -32,7 +36,14 @@ Report/*
 !Report/midterm_report.tex
 !Report/midterm_report.pdf
 
+
 # folders to keep
 !Report/vector_space/
 !Report/results/
 !Report/images/
+
+# Rstudio files
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata

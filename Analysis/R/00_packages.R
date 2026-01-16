@@ -1,6 +1,5 @@
 load_packages <- function() {
   library(tidyr)
-  library(dplyr)
   library(ggplot2)
   library(ggtext)
   library(forcats)
@@ -8,9 +7,14 @@ load_packages <- function() {
   library(modelsummary)
   library(Hmisc)
   library(broom)
+  library(patchwork)
   library(readr)
-  library(lme4)        # and/or lmerTest
+  library(lme4)        
   library(ggdist)
   library(stargazer)
   library(here)
+  library(glmmTMB)
+  library(dplyr)
+  library(patchwork)
+  library(DHARMa)
 }

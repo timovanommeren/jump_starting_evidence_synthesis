@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 
 from stimulus import select_criteria
-from prompting_only_inclusion import generate_abstracts
+from prompting import generate_abstracts
 
 
 ### Prepare the llm datasets ###
@@ -62,7 +62,7 @@ def prepare_datasets(dataset: pd.DataFrame, name: str, criterium: list, out_dir:
     
     # Create dataframe with 2 prior rows: inclusion criteria (label=1) and exclusion criteria (label=0)
     included_row = {col: '' for col in dataset.columns}
-    included_row['abstract'] = stimuli['Eligibility criteria']
+    included_row['abstract'] = stimuli['inclusion_criteria']
     included_row['label_included'] = 1
     criteria_data = pd.DataFrame([included_row])
 

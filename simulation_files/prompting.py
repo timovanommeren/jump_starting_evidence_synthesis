@@ -60,7 +60,7 @@ def generate_abstracts(name: str, stimulus: list, out_dir: Path, n_abstracts: in
             #generate relevant abstract
             relevant = make_abstract(
                 label_relevant=1,
-                criteria = stimulus['Eligibility criteria'],
+                criteria = stimulus['inclusion_criteria'],
                 length_abstracts=length_abstracts,
                 llm_temperature=llm_temperature,
             )

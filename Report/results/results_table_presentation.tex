@@ -1,0 +1,58 @@
+
+% Table created by stargazer v.5.2.3 by Marek Hlavac, Social Policy Institute. E-mail: marek.hlavac at gmail.com
+% Date and time: Tue, Dec 09, 2025 - 15:48:12
+\begin{table}[!htbp] \centering 
+  \caption{Effect of initialisation on the number relevant records found in first 100 screened} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{4}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-5} 
+\\[-1.8ex] & \multicolumn{4}{c}{Outcome: number of records found} \\ 
+\\[-1.8ex] & (1) & (2) & (3) & (4)\\ 
+\hline \\[-1.8ex] 
+ \multirow{2}{*}{\shortstack[l]{Criteria\\Condition}} & $-$0.738 & $-$0.738 & $-$0.738 & $-$0.778 \\ 
+  & (0.445) & (0.445) & (0.445) & (1.859) \\ 
+  & & & & \\ 
+ \multirow{2}{*}{\shortstack[l]{Cold Start\\Condition}} & $-$11.589 & $-$11.589 & $-$11.589 & $-$11.647 \\ 
+  & (0.445) & (0.445) & (0.445) & (2.924) \\ 
+  & & & & \\ 
+ \multirow{2}{*}{\shortstack[l]{True Examples\\Condition}} & $-$0.547 & $-$0.547 & $-$0.547 & $-$0.573 \\ 
+  & (0.445) & (0.445) & (0.445) & (1.302) \\ 
+  & & & & \\ 
+ \multirow{2}{*}{\shortstack[l]{Number of \\ abstracts}} &  & $-$0.253 &  &  \\ 
+  &  & (0.126) &  &  \\ 
+  & & & & \\ 
+ \multirow{2}{*}{\shortstack[l]{Length \\ abstracts}} &  & $-$0.009 &  &  \\ 
+  &  & (0.096) &  &  \\ 
+  & & & & \\ 
+ \multirow{2}{*}{\shortstack[l]{LLM \\ temperature.}} &  & 0.043 &  &  \\ 
+  &  & (0.966) &  &  \\ 
+  & & & & \\ 
+ \multirow{2}{*}{\shortstack[l]{\% relevant records}} &  &  & 1.802 & 2.801 \\ 
+  &  &  & (0.583) & (0.352) \\ 
+  & & & & \\ 
+ \multirow{2}{*}{\shortstack[l]{LLM\\Condition}} & 30.931 & 30.931 & 23.167 & 18.896 \\ 
+  & (3.876) & (3.876) & (4.132) & (4.549) \\ 
+  & & & & \\ 
+\hline \\[-1.8ex] 
+$\mathrm{Var}(u_{0j})$ & 358.264 & 358.264 & 256.071 & 440.466 \\ 
+$\mathrm{Var}(u_{1j})$ &  &  &  & 80.71 \\ 
+$\mathrm{Var}(u_{2j})$ &  &  &  & 202.946 \\ 
+$\mathrm{Var}(\varepsilon_{ij})$ & 84.556 & 84.456 & 84.556 & 39.48 \\ 
+$\rho(u_{0j}, u_{1j})$ &  &  &  & 6.203 \\ 
+$\rho(u_{0j}, u_{2j})$ &  &  &  & -0.18 \\ 
+$\rho(u_{1j}, u_{2j})$ &  &  &  & -0.885 \\ 
+$\Delta$ deviance (df) &  & 4.02 (3) & 8.04 (1)** & 2345.89 (9)*** \\ 
+Log Likelihood & $-$12,503.040 & $-$12,501.030 & $-$12,499.020 & $-$11,326.080 \\ 
+Akaike Inf. Crit. & 25,018.080 & 25,020.070 & 25,012.040 & 22,684.150 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\multicolumn{5}{l}{Model 1: only initialization conditions.} \\ 
+\multicolumn{5}{l}{Model 2: adds within-dataset covariates.} \\ 
+\multicolumn{5}{l}{Model 3: adds between-dataset covariates.} \\ 
+\multicolumn{5}{l}{Model 4: adds random effects for initialization.} \\ 
+\multicolumn{5}{l}{$^{*} p<0.1; ^{**} p<0.05; ^{***} p<0.01$} \\ 
+\end{tabular} 
+\end{table} 

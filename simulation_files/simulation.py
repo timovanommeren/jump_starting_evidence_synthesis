@@ -9,8 +9,8 @@ from asreview.models.queriers import Random, Max
 from asreview.models.stoppers import IsFittable
 from asreview.models.stoppers import NLabeled
 
-from priors_only_inclusion import sample_priors
-from llm_only_inclusion import prepare_datasets
+from priors import sample_priors
+from llm import prepare_datasets
 from metrics import evaluate_simulation
 
 
@@ -55,7 +55,7 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
                 classifier=SVM(C=0.11, loss="squared_hinge", random_state=run),
                 balancer=Balanced(ratio=9.8),
                 feature_extractor=Tfidf(**tfidf_kwargs),
-                stopper=NLabeled(stop_at_n)
+                stopper=NLabeled(stop_at_n + len(dataset_criteria['prior_idx']))
             )
         ]
         
@@ -69,8 +69,6 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
         ### RUN SIMULATION ############################################################################################
 
         print(f"Running simulations for dataset: {dataset_names}")
-
-        print(prior_idx)
         
         # Run simulation with LLM priors
         simulate_llm = asreview.Simulate(X=dataset_llm['dataset'], labels=dataset_llm['dataset']["label_included"], cycles=alc)
@@ -112,7 +110,6 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
         df_results_llm = simulate_llm._results.dropna(axis=0, subset="training_set")
         df_results_criteria = simulate_criteria._results.dropna(axis=0, subset="training_set")
         df_results_no_initialisation = simulate_no_initialisation._results.dropna(axis=0, subset="training_set")
-
 
         simulation_results[dataset_names] = {
             'random': df_results_random,

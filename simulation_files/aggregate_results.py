@@ -7,20 +7,16 @@ from metrics import aggregate_recall_plots
 
 stop_at_n = 100 
 
-in_dir = Path(r"C:\\Users\\timov\\Desktop\\Utrecht\\Utrecht\\MSBBSS\\thesis_timo\\Synergy\\synergy_dataset")
-out_dir = Path(r'C:\\Users\\timov\\Desktop\\Utrecht\\Utrecht\\MSBBSS\\thesis_timo\\simulation_results\\inclusion_only')
+out_dir = Path(r'C:\\Users\\timov\\Desktop\\Utrecht\\Utrecht\\MSBBSS\\thesis_timo\\simulation_results\\correct_trials')
 
-# import the paths of all files in the input directory
-data_paths = [f for f in Path(in_dir).iterdir() if f.is_file()]
+datasets = [p.name for p in out_dir.iterdir() if p.is_dir()]
 
-# import all the of the datasets
-datasets = {file.stem: pd.read_csv(file) for file in data_paths}
-
-for dataset in datasets:
-    (out_dir / dataset).mkdir(parents=True, exist_ok=True)
+print(datasets) 
 
 aggregate_recall_plots(
     datasets=datasets, 
     out_dir=out_dir, 
     stop_at_n=stop_at_n
 )
+
+print("Aggregation complete.")
