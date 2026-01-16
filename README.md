@@ -7,7 +7,7 @@ In short, the contents of this repository allow for:
 2. A replication of the analysis only in R,
 3. To render the final research report in Latex.
 
-Note that the results of the simulation study are provided on (OSF)[https://osf.io/4ebmk/files/osfstorage].
+Note that the results of the simulation study are provided on [OSF](https://osf.io/4ebmk/files/osfstorage).
 
 ## Replication of simulation study in Python
 
@@ -15,11 +15,13 @@ To be able to replicate the results of the simulation study, please follow the i
 
 ### Set-up
 
-(1) Clone this repository 
+(1) Clone this repository.
 
 (2) Download necessary files
 
-Start by downloading the SYNERGY dataset from the following github page: (SYNERGY)[https://github.com/asreview/synergy-dataset] and the inclusion criteria of all the synergy datasets from the OSF link provided above.
+Start by downloading the SYNERGY dataset from the following github page: [SYNERGY](https://github.com/asreview/synergy-dataset) and the inclusion criteria of all the synergy datasets from the OSF link provided above.
+
+(3) Obtain an [OPENAI API key](https://openai.com/api/).
 
 ### Run the simulation study
 
