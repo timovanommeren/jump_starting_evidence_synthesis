@@ -71,6 +71,8 @@ The analysis can then be run by either opening Analysis/R/main_analysis.Rmd in R
 rmarkdown::render("Analysis/R/main_analysis.Rmd")
 ```
 
+(Note that if the simulation results were downloaded from OSF directly, these should be stored as ../simulation_results/run_01/all_simulation_results.csv for the R markdown code to run smoothly. 
+
 ## Knitting the research report
 
 After running the statistical analysis in R, it is possible to run the main.tex file to generate a pdf of the research report:
