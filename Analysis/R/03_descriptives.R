@@ -18,42 +18,58 @@ descriptive_tables <- function(data) {
 
 
 
-descriptive_barchart <- function(data, metadata, variable) {
+library(dplyr)
+library(forcats)
+library(ggplot2)
+library(rlang)
 
+descriptive_barchart <- function(data, metadata, variable, y_axis = 100) {
+  var_quo  <- enquo(variable)          # capture column
+  var_name <- as_name(var_quo)         # e.g. "papers_found"
+  
+  # Step 1: mean per dataset x condition
   means <- data %>%
     group_by(dataset, condition) %>%
     summarise(
-      mean_value = mean({{ variable }}),
+      mean_value = mean(!!var_quo),
       .groups = "drop"
     ) %>%
-    pivot_wider(names_from = condition, values_from = mean_value) %>%
+    tidyr::pivot_wider(names_from = condition, values_from = mean_value) %>%
     mutate(contrast = .data[["llm"]] - .data[["no_initialisation"]]) %>%
-    select(dataset, contrast)
-
+    dplyr::select(dataset, contrast)
+  
+  # Step 2: join contrast back to full data
   data_with_contrast <- data %>% left_join(means, by = "dataset")
-
+  
+  # Step 3: compute mean and SE per dataset x condition
   plot_data <- data_with_contrast %>%
     group_by(dataset, condition, contrast) %>%
     summarise(
       n = n(),
-      variable_mean = mean({{ variable }}),
-      variable_se   = sd({{ variable }}) / sqrt(n),
+      variable_mean = mean(!!var_quo),
+      variable_se   = sd(!!var_quo) / sqrt(n),
       .groups = "drop"
     ) %>%
     tidyr::replace_na(list(variable_se = 0))
-
+  
   plot_data <- plot_data %>%
-    left_join(metadata %>% select(dataset, percent_rel), by = "dataset") %>%
-    mutate(dataset = fct_reorder(
-      paste0(dataset, " (", percent_rel, "%)"),
-      percent_rel, .desc = TRUE
-    ))
-
+    left_join(metadata %>% dplyr::select(dataset, percent_rel), by = "dataset") %>%
+    mutate(
+      dataset = fct_reorder(
+        paste0(dataset, " (", percent_rel, "%)"),
+        percent_rel,
+        .desc = TRUE
+      ),
+      condition = factor(
+        condition,
+        levels = c("llm", "criteria", "random", "no_initialisation")
+      )
+    )
+  
+  
   plot <- ggplot(
     plot_data,
-    aes(x = dataset,
-        y = variable_mean,
-        fill = factor(condition))
+    aes(x = dataset, y = variable_mean, fill = factor(condition))
   ) +
     geom_col(position = position_dodge(width = 0.8), width = 0.7) +
     geom_errorbar(
@@ -62,50 +78,48 @@ descriptive_barchart <- function(data, metadata, variable) {
       position = position_dodge(width = 0.8),
       width = 0.2
     ) +
-    geom_hline(yintercept = 100,
-               linetype = "dashed",
-               color = "black",
-               linewidth = 0.4) +
+    geom_hline(yintercept = y_axis, linetype = "dashed", color = "black", linewidth = 0.4) +
     labs(
       title = "",
       x = "Datasets <span style='color:#888888;'>(ordered by percent_rel of relevant records)</span>",
-      y = "Number of relevant records",  # you could parameterise this too
+      y = "",
       fill = "Examples given before screening:"
     ) +
     scale_fill_manual(
       values = c(
-        llm             = "chartreuse3",
-        random          = "blue",
-        criteria        = "orange",
+        llm = "chartreuse3",
+        random = "blue",
+        criteria = "orange",
         no_initialisation = "red"
       ),
-      breaks = c("llm", "random", "criteria", "no_initialisation"),
-      labels = c("LLM-generated", "True examples", "Eligibility criteria","None")
+      breaks = c("llm", "criteria", "random", "no_initialisation"),
+      labels = c("LLM", "Inclusion criteria", "True examples", "Cold Start")
     ) +
     theme_minimal() +
     theme(
-      plot.title       = element_text(hjust = 0.5, face = "bold"),
-      axis.title.x     = element_markdown(),
-      axis.title.y     = element_markdown(),
+      plot.title    = element_text(hjust = 0.5, face = "bold"),
+      axis.title.x  = ggtext::element_markdown(),
+      axis.title.y  = ggtext::element_markdown(),
       panel.background = element_rect(fill = "white", color = NA),
       plot.background  = element_rect(fill = "white", color = NA),
-      legend.background= element_rect(fill = "white", color = NA),
+      legend.background = element_rect(fill = "white", color = NA),
       legend.key       = element_rect(fill = "white", color = NA),
-      plot.margin      = margin(10, 20, 10, 10),
-      axis.text.x      = element_text(angle = 55, hjust = 1),
-      legend.position  = "top"
+      plot.margin = margin(10, 20, 10, 10),
+      axis.text.x = element_text(angle = 55, hjust = 1),
+      legend.position = "top"
     )
-
+  
   ggsave(
-    filename = here::here("Report/results/papers_found_barchart.png"),
+    filename = here::here(paste0("Report/results/", var_name, "_barchart.png")),
     plot = plot,
     width = 10,
     height = 6,
     dpi = 300
   )
-
+  
   plot
 }
+
 
 
 
@@ -115,7 +129,7 @@ plots_llm_vs_no_init_conditions <- function(simulation, dataset_name) {
 
   diff <- simulation %>%
     filter(dataset == dataset_name) %>%
-    select(run, condition, papers_found) %>%
+    dplyr::select(run, condition, papers_found) %>%
     mutate(diff_llm_no = llm - no_priors)
 
 

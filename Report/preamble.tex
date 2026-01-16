@@ -22,6 +22,10 @@
 \usepackage{verbatim} % for \verbatiminput
 \usepackage{catchfile}
 \usepackage{multirow}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{setspace}
+
 
 % Bibliography
 \usepackage[backend=biber, style=authoryear, sorting=nyt]{biblatex}  
@@ -41,7 +45,7 @@
   \immediate\write18{texcount -inc -sum -0 -template={SUM} \jobname.tex > \jobname.wc 2> nul}%
   % Read the result from the temporary file:
   \CatchFileDef{\wcresult}{\jobname.wc}{}%
-  \wcresult
+  \mbox{\wcresult\unskip}%
 }
 
 

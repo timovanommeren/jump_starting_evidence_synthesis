@@ -12,161 +12,316 @@
 \include{titlepage}
 
 \section{Introduction}
-\textbf{500 words}
 
-\subsection{Background}
+\subsection{Background and Motivation}
 
-\subsubsection{Active Learning Models for Systematic Reviewing}
+\subsubsection{The framework: AI-assisted systematic reviews}
 
-Researchers and practitioners are continually challenged to base their decisions on the latest scientific evidence. Systematic reviews and meta-analyses were developed to address this need as rigorous methods of summarizing scientific literature \parencite{chalmers2002brief, bastian2010seventy}. However, systematically reviewing the literature can be time-consuming, which limits its practical applicability, especially, in, for example, times of crisis \parencite{tricco2020rapid, nussbaumer2021resource}.
+Researchers and practitioners are continually challenged to base their decisions on the latest scientific evidence. To that end, systematic reviews and meta-analyses were developed as rigorous methods of summarizing scientific literature \parencite{chalmers2002brief, bastian2010seventy}. However, systematically reviewing large bodies of literature can be time-consuming, which limits the practical applicability of systematic reviews \parencite{tricco2020rapid, nussbaumer2021resource}.
 
-Fortunately, recent advances in machine learning have produced tools that allow for the systematic screening of scientific literature while greatly reducing the need for manual screening \parencite{van2021open}. Specifically, active learning models (ALMs) ask users to screen titles and abstracts of papers one by one. Based on the user's decision, the models reassess the probability that the remaining papers are relevant and thus whether to show them to the user. In other words, these models continually reshuffle the papers retrieved from a scientific literature search based on the user's interests. This method reduces the time needed to find as many relevant papers as possible compared to simple index-based screening \parencite{van2025hunt}. 
+Fortunately, recent advances in machine learning have produced tools that enable the systematic screening of scientific literature while greatly reducing the need for manual screening \parencite{van2021open}. Specifically, active learning models ask users to screen titles and abstracts of papers one by one. Based on the user's decision, the model reassess the probability that each of the remaining papers is relevant, assigns them a 'relevance score' and orders them accordingly. In other words, these models continually reshuffle the papers retrieved from a scientific literature search based on the user's decisions. This method reduces the time needed to find as many relevant papers as possible compared to simple index-based screening \parencite{van2025hunt}. 
 
-\subsubsection{The Cold Start Problem}
+\subsubsection{The problem: the cold start problem}
 
-A key challenge to using active learning for systematic reviews is that these models face a "cold start" \parencite{panda2022approaches}. For an ALM to query a user with a potentially interesting paper, the model must first have knowledge of the user's interests . One way of overcoming a cold start is to initialize, or 'warm up', the ALM using examples of relevant and irrelevant papers \parencite{teijema2025large}. If however no examples are available the user may simply start screening papers at random, until a relevant and an irrelevant paper have been found. 
+A key challenge to using active learning for systematic reviews is that these models face a "cold start" \parencite{panda2022approaches}. For an ALM to query a user with a potentially relevant paper, the model must first have an idea of what constitutes relevance. One way of overcoming a cold start is to initialize, or 'warm up', the ALM using examples of relevant and irrelevant papers \parencite{teijema2025large}. If however no examples are available the user may simply start screening papers at random, until a relevant and an irrelevant paper have been found. The cold start problem is particularly problematic when the percentage of relevant papers returned by a systematic search is low, as screening at random until the first relevant abstract is found may take a long time.
 
-\subsubsection{The Advent of Large Language Models}
+\subsubsection{The proposed solution: large language models}
 
-With the recent advent of large language models (LLMs), a new possible solution to overcoming the cold start problem has emerged \parencite{bachmann2025adaptive}. Instead of screening papers at random until relevant and irrelevant examples are found, LLMs can generate synthetic examples of both based on the systematic review's inclusion and exclusion criteria. This approach may be particularly advantageous when the percentage of relevant papers returned by a systematic search is low. In this case, screening using even suboptimal examples of relevant and irrelevant papers may be preferable to randomly screening hundreds or thousands of papers. In other words, something may be better than nothing. However, synthetic data may also misdirect the ALM by contaminating the model's training data. 
+With the recent advent of large language models (LLMs), a new possible solution to the cold start problem has emerged \parencite{bachmann2025adaptive, bayer2024activellm}. Instead of screening papers at random until relevant and irrelevant abstracts are found, LLMs can generate synthetic examples of both based on the systematic review's inclusion and exclusion criteria. The use of LLMs may add information beyond what is contained in the inclusion and exclusion criteria by generating examples that are more similar to actual abstracts of relevant papers, than the inclusion and exclusion criteria themselves.
 
-In summary, the 'cold start' problem may be overcome and the performance of ALM-assisted screening improved by initialising the ALM with relevant and irrelevant paper examples generated by LLMs. This approach could be particularly useful if a user has no relevant examples available, as it avoids random screening. A key question, however, is whether LLM-generated examples improve starting performance beyond that achieved through initialisation using the systematic review's inclusion and exclusion criteria directly.
+\hspace{1cm}
+
+In summary, the 'cold start' problem may be overcome and the performance of AI-assisted screening improved by providing the AI-model with examples of relevant abstracts generated by an LLM based on the systematic review's inclusion and exclusion criteria.
+
+\subsection{Statistical Framework}
+
+% \subsubsection{Generalized Linear Mixed Models for discrete proportion data}
+
+% Defining residual variance for non-gaussian models is non-trivial. One way of definining residual variance is as 1 minus the ratio of the maximum likelihood of the current model and the null model. This definition, however, can become problematic when extended to non-gaussian mixed models, in part because likelihoods cannot be compared when using restricted maximum likelihood estimation (REML) \parencite{nakagawa2013general, stroup2024generalized}. Similarly, the intraclass correlation coefficient (ICC), which quantifies the proportion of variance explained by grouping structure in mixed models, is not straightforward to compute for non-gaussian models \parencite{nakagawa2017coefficient}. One solution is to de-couple the meand and variance using a variance-stabilizing transformation \parencite{nakagawa2010repeatability}.
+
+% There are no established REML methods for non-gaussian mixed models \parencite{maestrini2024restricted}. One way of dealing with this is to use maximum likelihood estimation (ML) instead. However, ML estimates of variance components may be biased downwards. Another solution is to use Bayesian methods, which do not rely on ML or REML.
+
+
+
+\subsubsection{Data generating process 1: AI-assisted screening}
+
+The starting performance of AI-assisted systematic reviews can be evaluated by simply counting the number of relevant papers successfully retrieved from a given number of screened papers (i.e., X out of n, with $n \leq 100$ trials). In other words, we may discount the fact that the true data generating process (DGP) is a dynamic sequence, and consider starting performance as a discrete proportion of successes from independent trials. This simplifying assumption allows for the application of generalized linear models (GLMs), specifically the binomial model \parencite{nelder1972generalized}. 
+
+The main issue with applying a binomial model to a dynamic sequence is that, in contrast to assumed independent Bernoulli trials, a successful retrieval increases the probability of subsequent successes, and vice versas\footnote{%TC:ignore
+The DGP of AI-assisted screening can be seen as analogous to the Pólya urn problem, in which each time a ball of a certain colour is drawn, an additional ball of the same colour is added to the urn ('the rich get richer'; \cite{eggenberger1923uber, kotz2000generalized}). Moreover, the beta-binomial model can be derived from Pólya's urn model \parencite{helfand2013polya}.}. %TC:endignore 
+This reinforcement mechanism leads to dependence between trials which increases the variance in the number of successes compared to what would be expected under a binomial model, which manifests as overdispersion. One way of dealing with overdispersion is to use a beta-binomial model \parencite{skellam1948probability, harrison2015comparison, kim2017validation}. The beta-binomial is generalized linear mixed model (GLMM) in which the probability of success is a random variable that follows a beta distribution \parencite{stroup2024generalized}. Formally, the beta-binomial model can be defined as follows:
+
+\begin{equation}
+X_i | p_i \sim \text{Binomial}(n_i, p_i) \quad \text{with } p_i \sim \text{Beta}(\alpha_i, \beta_i)
+\end{equation}
+
+For interpretability, we reparamterize $\alpha_i$ and $\beta_i$ in terms of the beta mean, $\mu_i$, and precision, $\phi_i$:
+
+\begin{equation}
+p_i \sim \text{Beta}(\mu_i \phi_i, (1 - \mu_i)\phi_i) \quad \text{with } \mu_i = \frac{\alpha_i}{\alpha_i + \beta_i} \quad \text{and} \space \phi_i = \alpha_i + \beta_i
+\end{equation}
+
+This reparametrisation further clarifies how modelling can work using the beta-binomial model \parencite{stroup2024generalized}. For example, the mean parameter $\mu_i$ can be modelled using a GLM, while the precision parameter $\phi_i$ can be used to either simply control for overdispersion (i.e., a single precision parameter for all observations) or to model heterogeneity in overdispersion (i.e., different precision parameters for different groups of observations).
+
+\subsubsection{Data generating process 2: random sampling due to a cold start}
+
+In reality, two DGP are at play in AI-assisted systematic reviews. The first is AI-assisted screening, which takes place once the AI has been trained using relevant and irrelevant titles and abstracts. However, in the cold-start condition, screening must be done at random until at least one relevant and one irrelevant paper have been identified. This may result in runs where no relevant papers are found. These 'structural zeros' may be considered to come from a different DGP. One way to address this issue is to use zero-inflation models \parencite{lambert1992zero, wagner2015importance}. 
+
+More specifically, we are dealing with a hurdle model, in which the first part of the model (the hurdle) models whether or not any relevant papers are found, while the second part of the model models the number of relevant papers found given that at least one relevant paper has been found \parencite{mullahy1986specification}. Formally, this can be defined as follows:
+
+\subsubsection{Multilevel structure: clustering by dataset}
+
+Finally, starting performance may vary systematically between datasets due to differences in topic, percentage of relevant papers return by search, and abstract style, for example \parencite{de2023synergy}. One way of dealing with differences between datasets is to add dataset as a covariate to the model. However, since we are not interested in the effect of specific datasets per se, it may make more sense to treat dataset-specific variations as the results of a random variable. In other words, we may treat dataset as a random effect in a generalized linear mixed model (GLMM) (see Chapter 1 of \cite{stroup2024generalized} for when GLMMs are appriopriate).
+
 
 
 \subsection{Objectives}
 
-This study aims to investigate the effect of using LLM-generated data to initialise active learning models (ALMs) for systematic reviews, compared to random initialisation, no initialisation or criteria-based initialisation, on starting performance. This will be achieved by simulating the screening of previously published systematic reviews.
+This study aims to investigate whether the starting performance of AI-assisted systematic reviews can be improved by initialising the AI-model with synthetic abstracts generated by an LLM, based on a systematic review's inclusion and exclusion criteria. This was done by simulating the screening of previously conducted systematic reviews. 
 
-% The aim is to investigate the effect \textit{on starting performance} of initializing  ALMs for systematic reviews using:
-% \begin{enumerate}[label=\arabic*), leftmargin=*, nosep]
-%     \item examples of relevant and irrelevant papers generated by LLMs;
-%     \item examples of relevant and irrelevant papers randomly sampled from the sets of screened papers;
-%     \item without any examples,
-% \end{enumerate}
+% The starting performance will then be compared to that of three control conditions: the Cold-Start condition, in which no relevant papers are provided prior to screening; the True-Example condition, in which one relevant paper is sampled at random prior to screening; and the Inclusion-Criteria condition, in which the inclusion and exclusion criteria directly function as an example of a relevant abstract. 
 
 \section{Methodology}
-\textbf{1000 words}
 
 \subsection{Conditions}
 
-This study aims to compare the effect of LLM initialisation with that of three control conditions: random initialisation, no initialisation, and criteria-based initialisation. In all conditions except the 'no initialisation' condition, the LLM is initialised using only relevant papers. This is because systematic reviews contain a large number of irrelevant papers, meaning they no 'cold start' problem.
+\subsubsection{Experimental condition: synthetic-abstracts}
 
-\subsubsection{Experimental condition: LLM initialization}
-
-In the LLM initialisation condition, the ALM's classifier is provided with a set of examples comprising at least one relevant paper before screening is simulated. These examples are generated based on the inclusion and exclusion criteria of the given systematic review publication. See figure \ref{fig:sim-pipeline} for a schematic of the simulation pipeline. 
+In the LLM condition, the AI-model is provided with at least one set of titles and abstracts comprising a relevant paper before screening is simulated. These examples are generated based on the inclusion and exclusion criteria of the given systematic review publication. See figure \ref{fig:sim-pipeline} for a schematic of the simulation pipeline. 
 
 Between simulation runs the exact number of abstracts generated as well as their specific contents is varied. More specifically, we aimed to investigate the effect of the following variables on starting performance: 
 \begin{enumerate}[label=\arabic*)]
 \item number of abstracts generated per simulation run \textit{(1, 4 or 7 abstracts)},
-\item length of abstracts generated per simulation run \textit{(200, 500, 1000 words)},
-\item the temperature setting on the LLM \textit{(0.0, 0.4, 0.8)},
+\item length of abstracts generated per simulation run \textit{(100, 500, 900 words)},
+\item the temperature (diversity) setting on the LLM \textit{(0.0, 0.4, 0.8)},
 \end{enumerate}
 
-To instruct the LLM, a DSPY module was created which takes the variables described above as input, along with the inclusion and exclusion criteria of the systematic review and a generic prompt \parencite{khattab2023dspy}. The module then generates the desired number of abstracts using OpenAI's gpt-4o-mini model. For the exact code, see: \href{https://github.com/timovanommeren/thesis_timo/blob/main/simulations/prompting.py}{here}
+To instruct the LLM, a DSPY module (i.e., a module for dynamic prompt generation within Python) was created which takes the variables described above as input, along with the inclusion and exclusion criteria of the systematic review and a generic prompt \parencite{khattab2023dspy}. The DSPY module then generates the desired number of abstracts using OpenAI's gpt-4o-mini model. For the exact code, see: \parencite{githubjumpstart2025}.
 
 \subsubsection{Control conditions}
 
-In the \textit{random initialization} condition, one relevant paper was sampled at random prior to the start of screening (with replacement between runs). In the \textit{criteria-based initialisation}, the inclusion and exclusion criteria of the systematic review directly functioned as an example of an abstract of a relevant paper with which to initialise the ALM. In the \textit{no initialisation} condition, no papers were provided prior to the start of screening.
+There are three control conditions. The first control condition is the \textit{cold-start} condition, in which no papers are provided prior to the start of screening. In this condition, papers must therefore be screened at random until at least one relevant and one irrelevant paper are found. This condition serves as a baseline against which to compare the effect of LLM initialisation on starting performance. 
 
+The second control condition is the \textit{true-example} condition, in which one relevant paper is sampled from the set of actually relevant papers in the systematic review (with replacement between runs). This condition serves to compare the use of LLM-generated examples to the use of actual examples of relevant papers. 
+
+The third control condition is the \textit{inclusion-criteria} condition, also known as the 'no-LLM' condition. It is is essentially the same as the experimental condition, except that the inclusion and exclusion criteria of the systematic review function directly as an example of an abstract of a relevant paper with which to initialise the LLM, rather than using the LLM to generate an example. This condition serves to investigate whether the LLM adds any value beyond the direct use of the inclusion and exclusion criteria.
 
 \subsection{Outcome variable}
 
 \subsubsection{Starting performance}
 
-Starting performance will be assessed based on the number relevant papers in the first 100 papers screened. This figure is derived from research showing that approximately 100 papers can be screened in an hour \parencite{nussbaumer2021resource}. For each simulation, we count the number of relevant records found with a \textit{Time to Discovery} below 100 for each simulation \parencite{ferdinands2023performance}.
+Starting performance was operationalized as the number of relevant records found within the first 100 records screened $X/n$, where $n <= 100$ (the number of papers screened may be less than 100 if all relevant records are found before reaching 100 screened papers). The first 100 is based on the idea that approximately 100 papers can be screened in an hour \parencite{nussbaumer2021resource}. 
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=1\textwidth]{simulation_setup.png} % adjust path/width
+  \caption{Simulation pipeline (for more detailed schematic of workings within ASReview see \parencite{asreviewvs2jonathan})}
+  \label{fig:sim-pipeline}
+\end{figure}
 
 \subsection{Simulation set-up}
 
-In order to investigate the effect between LLM initialisation and the control conditions on starting performance, the SYNERGY datasets will be screened based on the abstracts and titles of the papers using ASReview's ALM \parencite{van2021open, de2023synergy}. 
+The effect of using LLM-generated examples to initialize the AI-model on starting performance compared to starting performance in the three control conditions was investigated by simulating the abstract-title based screening of the SYNERGY datasets using ASReview's AI-model \parencite{van2021open, de2023synergy}. Futhermore, the effect of the number of abstracts, length of abstracts and temperature setting of the LLM on starting performance was investigated in the LLM condition using a factorial design (i.e., $3 \times 3 \times 3 = 27$ combinations) \parencite{morris2019using}. This was repeated 5 times for a total of 135 runs per condition. 
 
-ASReview is an open-source software package for semi-automated systematic reviewing that implements several ALMs. To simulate the screening process, we will access ASReview via its Python API. For all simulation runs, we will set the ALM to the recommended U4 configuration in ASReview, which combines a support vector machine classifier (seeded with the run number) with a bi-gram term-frequency inverse document frequency (TF-IDF) feature extractor and a querier which always present the next most likely paper \footnote{Note that two ALMs are technically used. A simple random querier is initially used to find at least one relevant and one irrelevant paper, including initialisation examples. After this, the U4 is used.}. 
+ASReview is an open-source software package for AI-assisted systematic reviews \parencite{van2021open}. To simulate the screening process, ASReview was accessed via its Python API. For all simulation runs, AI-model was set to the recommended U4 configuration in ASReview (see \cite{asreviewvs2jonathan} for U4 configuration)\footnote{Note that technically two configurations are sequentially used: first papers at retrieved at random until at least one relevant and one irrelevant paper have been found and the AI-model can be trained; followed by the U4 configuration.}. 
 
-The SYNERGY datasets consist of 24 previously screened and labelled sets of papers. Importantly, this gives us access to the ground truth labels of all the papers in these datasets. See Appendix \ref{tab:SYNERGY} for a list of all datasets including their topic, total number of records, number of records included and the percentage of relevant records \parencite{de2023synergy}. 
+The SYNERGY datasets comprise 24 sets of previously screened and labelled papers. Notably, this provides access to the decisions made by screeners for each paper in these datasets. See Appendix \ref{tab:SYNERGY} for a list of all datasets including their topic, total number of records, number of records included and the percentage of relevant records \parencite{de2023synergy}. 
 
-All simulations were done in \textit{Python version 3.10}. For all the code aswell as the full list of the packages and their versions, please see \href{https://github.com/timovanommeren/thesis_timo}{the github repository}. See appendix \ref{sec:format_exported_simulation_results} for a detailed description of how the simulation results were exported.
+All simulations were done in \textit{Python version 3.10}. For all the code aswell as the full list of the packages and their versions, please see the github repository \parencite{githubjumpstart2025}. See appendix \ref{sec:format_exported_simulation_results} for a detailed description of how the simulation results were exported. Note that to ensure that the simulation results accurately reflect the screening process, padding was applied to the simulation results (see appendix \ref{sec:padding} for full description).
 
 
 \hspace{1cm}
 
-\begin{figure}[htbp]
-  \centering
-    \begin{tikzpicture}[node distance=2.5cm]
-    
-    \tikzstyle{data} = [rectangle, minimum width=3cm, minimum height=1cm,text centered, draw=black, fill=red!40]
-    \tikzstyle{prompt} = [rectangle, rounded corners, minimum width=3cm, minimum height=1cm,text centered, draw=black, fill=yellow!40]
-    \tikzstyle{process} = [diamond, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=blue!30]
-    \tikzstyle{arrow} = [thick,->,>=stealth]
-    
-    % \tikzstyle{io} = [trapezium, trapezium left angle=70, trapezium right angle=110, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=blue!30]
-    % \tikzstyle{process} = [rectangle, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=red!30]
-    
-    \node[data]    (stim) {stimulus};
-    \node[process, right of=stim, xshift=0.8cm] (llm) {LLM};
-    \node[prompt,    above of=llm]  (prom)  {generic prompt};
-    \node[data,    right of=llm, xshift=0.8cm]  (ta)  {title + abstract};
-    \node[process, right of=ta, xshift=0.8cm]   (asr) {ASReview};
-    \node[data,    above of=asr]  (syn)  {SYNERGY dataset};
-    \node[data,    right of=asr, xshift=0.8cm]  (rel) {relevant papers};
-    
-    \draw[arrow] (stim) -- (llm);
-    \draw[arrow] (prom) -- (llm);
-    \draw[arrow] (llm)  -- (ta);
-    \draw[arrow] (ta)   -- (asr);
-    \draw[arrow] (syn)   -- (asr);
-    \draw[arrow] (asr)  -- (rel);
-    
-    \end{tikzpicture}
-    \caption{Simulation pipeline (for more detailed schematic of workings within ASReview see \parencite{asreviewvs2jonathan})}
-  \label{fig:sim-pipeline}
-\end{figure}
 
-\subsection{Data Generation and Analysis}
 
-\subsubsection{Padding}
-
-It is important to note that the simulation may stop prematurely if all the relevant records are found before the stopping rule is reached (e.g. after screening 100 records). To accurately emulate a researcher who is unaware that all the relevant records have been found and therefore continues screening until the stopping rule is reached, the simulation results were supplemented with rows containing the label 'zero' (i.e. irrelevant records) until the stopping rule would have been reached. This process is referred to as 'padding' and ensures that the final simulation results are accurate.
+\subsection{Analysis}
 
 \subsubsection{Analysis}
 
-The majority of the variance in the number of relevant records found in the first 100 screened is expected to be explained by differences between datasets. We would therefore like to seperate within-dataset variance from between-dataset variance. Ideal for this purpose are multilevel regression models which allow us to model the effect of condition on starting performance while accounting for between-dataset variance by including dataset as a random effect. To confirm that most of the variance is indeed between datasets, we will visualize the data using boxplots and fit a null model with only dataset as a random effect to calculate the intraclass correlation coefficient (ICC). An exploratory bottom-up modelling approach will then be used for multilevel analysis (for approach see chapter 4 of the book by \cite{hox2017multilevel}) and will be conducted in R using the \textit{lme4} package \parencite{bates2015fitting}. %(version 1.1.36)
+Starting performance was operationalized as the number of relevant records found within the first 100 records screened and was treated as discrete proportion data, $X/n$, where $n \leq 100$. Prior to the analysis, the predictors in the experimental condition (number of abstracts, abstract length, and temperature) were transformed using a dummy-variable approach \parencite{dziak2017two}, and mean-centred for interpretability. Next, a historgram of starting performance was plotted split by dataset and coloured by condition. Furthermore, the number of unique outcome values ($X/n$) per dataset and condition was inspected to assess possible convergence problems for more complex GLMMs. 
 
-Note that in the control conditions, the independent variables (i.e., number of abstracts, length of abstracts, temperature) are not applicable, and will therefore be coded as missing. To account for this apparent missingness, a dummy variable indicating whether the condition is the LLM initialisation condition or not will be included in the model using the approach described by \parencite{dziak2017two}
+Modelling was done in successive stages, starting with a simple binomial model and iteratively adding complexity before arriving at the final model \parencite{stroup2024generalized}. Only condition was included during model building, as this was the main effect of interest. Each model was fit using the \textit{glmmTMB} R package \parencite{Brooks_glmmTMB}, using maximum likelhood estimation (MLE). At each stage, model fit was evaluated using goodness-of-fit statistics (AIC, BIC), likelihood ratio tests (LRTs) where appriopriate, and by inspecting the randomized quantile residuals using the \textit{DHARMa} R package \parencite{hartig2016dharma}. 
+
+The \textit{glmmTMB} package does not offer restricted maximum likelihood estimation (REML), but rather uses MLE using the Laplace approximation \parencite{maestrini2024restricted}. For the final model (at the time of writing a simplified version thereof), a simulation study was performed to investigate the bias and variance in the coefficients, under the assumption that the model was correct, using MLE and REML \parencite{morris2019using}. No bias was found in the estimated coefficients but considerable variance was found in $\beta_0$. Consequently, while the exact estimate of starting performance in the reference condition (i.e., experimental LLM conditin) should be treated with caution, the main interest of this study -- the \textit{difference} in starting performance across conditions -- does not require such caution. Empirical bayes methods are possible using \textit{glmmTMB} too.
+
+The final model was a beta-binomial mixed model with a logit-link, random intercepts for dataset, one overdispersion parameter for all observations, and one zero-inflation to account for runs in which no relevant papers were found. Condition-specific overdispersion parameters were considered, but led to convergence problems, possibly due to the limited number of unique outcome values per dataset and condition. The inter-class correlation (ICC) was computed for the null-version of the final model \parencite{nakagawa2017coefficient}. Covariates were then added in an exploratory bottom-up modelling approach \parencite{hox2017multilevel}. The analysis was performed in R version 1.1.36.
 
 \section{Results (note: preliminary!)}
 
 \subsection{Descriptives}
 
-As expected, most of the variance in starting performance seems to be explained by differences between datasets. Figure \ref{fig:all-datasets} shows the number of relevant records found within the first 100 screened per dataset. This may be partly explained by the considerable variation in the number of relevant records present in each dataset. In fact, \input{results/perfect_recall_text.tex}
-
-
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=1\textwidth]{results/td_barchart.png} % adjust path/width
-  \caption{The number of relevant records found per dataset}
-  \label{fig:all-datasets}
+  \includegraphics[width=1\textwidth]{results/papers_found_histogram.png} 
+  \caption{Starting performance: the number of relevant records found divided by the number of trials}
+  \label{fig:aggregate-counts}
 \end{figure}
+
+The frequency of starting performance outcomes across all datasets and coloured by condition is shown in figure \ref{fig:aggregate-counts} (for the dataset-split histograms see Appendix ...). A few notable patterns emerge from these historgams. 
+
+The first is that while the aggregate histogram shows strong multi-modality and overdispersion, the dataset-specific histograms generally do not show these patterns. This supports the use of a random effect for dataset to account for between-dataset heterogeneity.
+
+That said, some dataset-condition combinations continue to show multi-modality. This is particurly true for the cold start condition but also for some others (e.g. the true-example condition in Walker 2018). The remaining multi-modality may be due to subgroups of runs with different characteristics (e.g., different initializations or random seeds) that lead to different performance levels. This supports the use of modelling succes probability as a random variable with a beta distribution (i.e., the beta-binomial model).
+
+The last notable pattern is that the cold-start condition shows a peak at zero, indicating that in some runs no relevant records were found within the first 100 screened records. This supports the use of a zero-inflation component to account for these 'structural zeros'.
+
+Finally, some datasets show limited variability in starting performance: the Donners 2021 and Leenaars 2019 dataset both had two or less unique runs in 3/4 conditions (the cold start conditions being the exception in both cases). Furthermore, the inclusion-criteria condition resulted in 2 or less unique runs for Radjenovic 2013, Smid 2020, Wolters 2018 and van der Waal 2022. 
+
+
 
 \subsection{Main results}
 
-\input{results/results_paragraph.tex}
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=0.45\textwidth]{aggregate_recall_plot_walker.png}
-  \includegraphics[width=0.45\textwidth]{aggregate_recall_plot_moran.png}
-  \caption{The number of relevant records found per dataset}
-  \label{fig:walker-2018}
-\end{figure}
 
 
-\input{results/results_table.tex}
+%TC:ignore
+
+% \begin{figure}[htbp]
+%   \centering
+%   \includegraphics[width=0.45\textwidth]{aggregate_recall_plot_walker.png}
+%   \includegraphics[width=0.45\textwidth]{aggregate_recall_plot_moran.png}
+%   \caption{The number of relevant records found per dataset}
+%   \label{fig:walker-2018}
+% \end{figure}
+
+
+\begin{table}[htbp]
+\centering
+\caption{Effect of initialisation condition on starting performance}
+\label{tab:midterm_models}
+
+\renewcommand{\arraystretch}{1.25} % vertical spacing
+\setlength{\tabcolsep}{5pt}        % horizontal spacing
+
+\small
+\begin{tabular}{lcccc}
+\toprule
+& (1) & (2) & (3) & (4) \\
+& Binom & BB & BB+ZI & BB+ZI \\
+\midrule
+
+\addlinespace[0.4em]
+\multicolumn{5}{l}{\textit{Fixed effects (log-odds)}} \\
+\addlinespace[0.2em]
+
+Criteria (LLM) &
+0.002 &
+0.028$^{\cdot}$ &
+-0.054$^{***}$ &
+-0.054$^{***}$ \\
+& (0.006) & (0.015) & (0.011) & (0.011) \\
+
+No initialisation &
+-0.678$^{***}$ &
+-0.944$^{***}$ &
+-0.487$^{***}$ &
+-0.487$^{***}$ \\
+& (0.006) & (0.017) & (0.012) & (0.012) \\
+
+Random initialisation &
+-0.019$^{**}$ &
+-0.018 &
+-0.071$^{***}$ &
+-0.071$^{***}$ \\
+& (0.006) & (0.015) & (0.011) & (0.011) \\
+
+Intercept &
+-0.925$^{***}$ &
+-0.882$^{***}$ &
+-0.826$^{***}$ &
+-0.826$^{***}$ \\
+& (0.200) & (0.193) & (0.187) & (0.187) \\
+
+\addlinespace[0.6em]
+\multicolumn{5}{l}{\textit{Random effects and dispersion}} \\
+\addlinespace[0.2em]
+
+SD(dataset intercept) &
+0.958 &
+0.926 &
+0.895 &
+0.895 \\
+
+Beta-binomial dispersion ($\phi$) &
+-- &
+15.6 &
+41.1 &
+41.1 \\
+
+Zero-inflation intercept &
+-- &
+-- &
+-2.497$^{***}$ &
+-2.497$^{***}$ \\
+& & & (0.035) & (0.035) \\
+
+\addlinespace[0.6em]
+\multicolumn{5}{l}{\textit{Model fit}} \\
+\addlinespace[0.2em]
+
+Log-likelihood &
+-62\,302.7 &
+-45\,409.4 &
+-42\,890.3 &
+-42\,890.3 \\
+
+AIC &
+124\,615.3 &
+90\,830.8 &
+85\,794.6 &
+85\,794.6 \\
+
+Marginal $R^2$ &
+0.082 &
+0.142 &
+0.005 &
+0.005 \\
+
+Conditional $R^2$ &
+0.968 &
+0.862 &
+0.118 &
+0.118 \\
+
+Observations &
+12\,420 &
+12\,420 &
+12\,420 &
+12\,420 \\
+
+Datasets &
+23 &
+23 &
+23 &
+23 \\
+
+\bottomrule
+\end{tabular}
+
+\vspace{0.6em}
+\footnotesize
+\begin{minipage}{0.9\textwidth}
+Notes: All models use a logit link and model the number of relevant records found out of the total number screened.
+Model (1) is a binomial GLMM estimated via \texttt{lme4}.
+Models (2)--(4) are beta-binomial GLMMs estimated via \texttt{glmmTMB}.
+Dispersion ($\phi$) is reported only for beta-binomial models.
+Zero-inflation is intercept-only.
+Marginal $R^2$ reflects variance explained by fixed effects; conditional $R^2$ reflects variance explained by fixed and random effects.
+$^{\cdot} p<0.1$, $^{*} p<0.05$, $^{**} p<0.01$, $^{***} p<0.001$.
+\end{minipage}
+
+\end{table}
+
+
 
 \section{Conclusion} 
 
-The results of this simulation study provide a proof of concept that LLM-initialization can improve starting performance of active learning models for systematic reviews compared no initialisation. Exploratory analyses suggest that the exact instructions given to the LLM (i.e., prompt engineering) does not seem to have a large effect on starting performance. The key lesson is thus that when it comes to active learning models for systematic reviews, something is better than nothing when it comes to initialisation. We thus recommend that researchers and practitioners consider using LLM-generated examples of relevant and irrelevant papers to initialise active learning models for systematic reviews, especially when no actual examples are available. However, future work should investigate whether initialisation using LLM-generated examples does not negatively impact the overall performance or last-to-find performance of active learning models for systematic reviews by contaminating the training data of these models. Moreover, future work should investigate whether these results generalize to real-world systematic reviews, as the current simulation study may have been affected by data leakage (i.e., LLMs have been trained on synergy datasets).
+The results of this simulation study provide a proof of concept that providing LLM-generated abstracts of relevant papers to active learning models for systematic reviews can improve starting performance compared to no initialisation (i.e., a cold-start). However, exploratory analyses suggest that the exact instructions given to the LLM (i.e., prompt engineering) does not affect starting performance. In line with these results, providing the AI-model with LLM-generated abstracts did not improve starting performance over and above merely directly providing the inclusion and exclusion criteria. It thus seems that LLMs simply repackage existing knowledge rather than adding new knowledge. 
 
 
+The key lesson is thus that when it comes to ALM for systematic reviews, something is better than nothing when it comes to initialisation. We thus recommend that researchers and practitioners consider using LLM-generated examples of relevant and irrelevant papers to initialise active learning models for systematic reviews, especially when no actual examples are available. However, future work should investigate whether initialisation using LLM-generated examples does not negatively impact the overall performance or last-to-find performance of active learning models for systematic reviews by contaminating the training data of these models. Moreover, future work should investigate whether these results generalize to real-world systematic reviews, as the current simulation study may have been affected by data leakage (i.e., LLMs have been trained on synergy datasets).
 
+
+A key question, however, is whether LLM-generated examples improve starting performance beyond that achieved through initialisation using the systematic review's inclusion and exclusion criteria directly.
 
 
 \section{Discussion}
@@ -182,27 +337,38 @@ The results of this simulation study provide a proof of concept that LLM-initial
   \label{fig:my-image}
 \end{figure}
 
+
+\subsubsection{Simulation design}
+
 In other words, whether, in the case of AI-assisted reviewing, prompt engineering actually aids in knowledge discovery or whether LLMs simply repackage existing knowledge.
 
 More LLM-specific variables were considered in advance (such as degree of jargon), however, because early simulations showed difference between the LLM- and criteria-based initialisation conditions, these variables were not further investigated. Future work may consider these variables in more detail.
 
-Since many datasets have less than a 100 relevant records, operationalizing starting performance as the number of relevant records found in the first 100 screened may be limiting, as in some runs all relevant records are found before the stopping rule is reached (). How quickly all relevant records are found is now not considered. Future work may consider alternative operationalizations of starting performance which take this into account.
-
 Most eligibility criteria are written in either conjunctive or disjunctive form. In the latter case, all the inclusion criteria must be met for a paper to be included, whereas in the former, only one must be met. This may affect how useful LLM-generated examples are compared to using the eligibility criteria directly or selecting random examples. This is because, for criteria in conjunctive form, abstracts will be relevant if and only if all the terms from the eligibility criteria are mentioned. In contrast, for criteria in in disjunctive form, the relevant abstracts will likely only contain one of the many terms mentioned in the eligibility criteria. 
 
+\subsubsection{Statistical Analysis}
+
+AI-assistant screening is actually sequence dependent. This is ignored by simply the summed successes and number of retrievals. Future work may consider modelling the sequence directly.
+
+The response variable makes sense to be viewed as a proportion and not a count because we know the true number of total relevant records. Future work modelling the retrieval of actual retrievals may more aptly consider it counts instead (e.g., Poisson).
+
+GLMM assume that the random effects are normally distributed (i.e., that the difference in starting performance between datasets follows a normal distribution). However, based on the results of a previous simulation study comparing the normalized loss performance of AI-assistant screening for different datasets, this seems unlikely \parencite{teijema2025large}. Future work may consider specifying a different random-effects distribution using hierarichal generalized linear models (HGLMs) or Bayesian methods.
 \subsection{Limitations}
 
 \begin{enumerate}
+    \item only one LLM used (gpt-4o-mini). Future work may consider other LLMs (e.g., open source LLMs).
     \item Key limitation simulation study: data leakage (i.e., LLMs have been trained on synergy datasets). The ecological validity of the results are therefore somewhat limited.
     \begin{enumerate}
         \item There are two obvious solutions to the problem of data leakage: (1) apply the use of LLm-initialization on a new systematic review, and (2) use an older LLM from hugging face for example. 
     \end{enumerate}
     \item Another possible limitation: no switching of active leaning cycles (could fix contamination of synthetic data issue). 
+    \item The multilevel model assumption of heterogeneity between conditions may not hold. 
+    \item The effect of the length abstract may be small in part because this parameter had limited effect on the generated abstracts. However, since early analyses showed that the effect of the other LLM-specific parameters was limited (i.e., for temperature and number of abstracts), it is unlikely that the effect of length of abstract would be large either.
 \end{enumerate}
 
 Clusters should not be a problem because we only focus on starting performance (i.e., first 100 screened). Future work may consider the contamination hypothesis in more detail. 
 
-%TC:ignore
+
 
 \appendix
 
@@ -277,6 +443,11 @@ Finally, at the end of each run, the current values of the input parameters, the
 \end{enumerate}
 
 This yields a data-frame containing one observation for each combination of dataset (n=26), condition (n=3), independent variables and their levels (n=$3 \times 4 \times 4 \times 5 \times 5 = 1200$), and run (n=1), thus with $26 \times 3 \times 1200 \times 1 = 93600$ rows, and the 12 columns enumerated above. 
+
+\section{Padding} \label{sec:padding}
+
+It is worth noting that the simulation may stop prematurely if all the relevant records are found before the stopping rule is reached (e.g. after screening 100 records). To accurately emulate a researcher who is unaware that all the relevant records have been found and therefore continues screening until the stopping rule is reached, the simulation results were supplemented with rows containing the label 'zero' (i.e. irrelevant records) until the stopping rule would have been reached. This process is referred to as 'padding' and ensures that the final simulation results are accurate.
+
 
 % References
 \printbibliography

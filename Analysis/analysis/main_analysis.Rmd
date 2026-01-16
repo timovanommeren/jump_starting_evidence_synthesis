@@ -1,19 +1,19 @@
 ---
-title: "papers_foundD_100"
-output: html_document
+title: "study_1_LLM"
+output:
+  pdf_document: default
+  html_document: default
 date: "2025-10-28"
 ---
 ```{r}
 library(here)
+here::i_am("Analysis/analysis/main_analysis.Rmd")
 
-source(here("Analysis/R/00_packages.R"))
 source(here("Analysis/R/01_load_data.R"))
 source(here("Analysis/R/02_prepare_data.R"))
 source(here("Analysis/R/03_descriptives.R"))
 # source(here("R/04_models.R"))
 # source(here("R/05_plots.R"))
-
-load_packages()
 
 ```
 
@@ -22,7 +22,7 @@ load_packages()
 ```{r load and transform data}
 
 # import simulation results and metadata (specify paths relative to project root)
-raw <- load_simulation_data(data = "simulation_results/inclusion_only/all_simulation_results.csv", 
+raw <- load_simulation_data(data = "simulation_results/run_01/all_simulation_results.csv", 
                              metadata = "Analysis/percentage_relevant.csv")
 
 # (1) transform simulation data to wide
@@ -31,156 +31,225 @@ raw <- load_simulation_data(data = "simulation_results/inclusion_only/all_simula
 # (5) truncate topic names to first topic only
 processed <- prepare_data(raw$simulation, raw$meta)
 
+
+
+processed$simulation <- processed$simulation %>%
+  filter(run <= 270)
+
+processed$simulation <- processed$simulation %>%
+  filter(dataset != "Moran_2021")
+
+# two-part coding of llm-specific predictors (implicit dummy variable creation through zero imputation, see reproduction_Dziak_Henry.Rmd for verification of method)
+processed$simulation <- two_part_coding(processed$simulation)
+
 # assign to variables for easier access
 simulation_long <- raw$simulation
 simulation      <- processed$simulation
 metadata        <- processed$meta
 
-colnames(simulation)[colnames(simulation) == 'papers_found'] <- 'papers_found'
-
 ```
+
+
 
 
 ## Descriptives
 
 ### Summary statistics
 
-```{r}
-head(simulation)
-summary(simulation)
+We will start with a numerical exploration of the dependent variable 'papers_found', representing the number of relevant records found within the first 100 screened records. 
 
-#export summary data to latex format text file ???
-```
+The number of papers found can be considered count data, meaning the data consists of only non-negative integers with a maximum of 100 since we are only considering the first 100 screened records (note that for many datasets the actual maximum is lower, since they contain less than 100 records -- see Appendix below); or as discrete proportions (out of 100). Count data often follows a Poisson distribution, which assumes that the mean and variance of the distribution are equal. However, in practice, count data can exhibit overdispersion (variance greater than the mean) or underdispersion (variance less than the mean), which can affect the choice of statistical models used for analysis. Discrete proportions can be modeled using binomial models, but these models also assume that the variance is a function of the mean. If the variance is larger than expected under a binomial distribution, this indicates overdispersion.
+
+That being said, we know that the underlying data generation process is not a simple Poisson process nor a binomial process, since the active learning model of ASReview selects records based on their predicted relevance. This means that the probability of finding relevant records is not constant across the first 100 screened records, but rather increases as more relevant records are found and the model learns from them. This is in line with Pólya's urn model, which describes a process where the probability of drawing a certain type of item increases as more items of that type are drawn, for example in the situation where red or white balls are drawn at random from an urn and every time a particular colour is drawn, two balls of that colour are put back into the urn. 
+
+If the screening process resembles a Pólya’s urn—where each success makes subsequent successes more likely—then a beta-binomial model is a natural choice because it captures extra-binomial variability (overdispersion) relative to independent Bernoulli trials. A useful way to see this is via the Pólya–beta correspondence: a Pólya urn that starts with $\alpha$ “success” balls and $\beta$ “failure” balls implies an initial success propensity of $\alpha/(\alpha+\beta)$, and reinforcement preserves this mechanism over draws. Formally, we can write
+$$
+Y \mid p \sim \text{Binomial}(n,p)
+$$
+with
+$$
+p \sim \text{Beta}(\alpha,\beta),
+$$
+which yields the marginal distribution
+$$
+Y \sim \text{Beta-Binomial}(n,\alpha,\beta).
+$$
+In this view, $\alpha$ and $\beta$ act like pseudo-counts (prior successes and failures) that determine the mean success rate and the strength of reinforcement (i.e., how strongly outcomes cluster), thereby inducing positive dependence among trials and producing overdispersion compared to a standard binomial model.
+
+Another option is to model zero-inflation, using a negative binomial, for example. This might actually make sense, since actually two active learning models are being used. The first is a random querier (just randomly searches through papers) and the second a max querier (retrieves the next most likely paper). The random querier is used until at least one relevant and one irrelevant paper have been retrieved (and thus the classifier predicting paper relevance can be trained). In most runs the max querier is almost exclusively used. However, in some runs in the cold start condition, the random querier is actually used for a long time. This very likely explains the zero inflation and may thus be seen as structural zero's.
 
 
-
-
-
-### Centering predictors
-
-Let's start by centering the llm-specific predictors within the llm condition, and setting them to 0 in the other conditions (two-part coding). This way, the coefficients for the condition factor will represent the difference in papers_found between the llm condition (when llm parameters are at their mean) and the other conditions.
-
-```{r}
-
-simulation <- simulation %>%
-  mutate(
-    
-    # indicator where llm parameters are actually defined
-    llm_active = (condition == "llm"),
-
-    # set to 0 if not llm condition (two-part coding)
-    n_abstracts_llm = ifelse(
-      llm_active,
-      n_abstracts - mean(n_abstracts[llm_active], na.rm = TRUE),
-      0
-    ),
-    length_abstracts_llm = ifelse(
-      llm_active,
-      length_abstracts  - mean(length_abstracts[llm_active], na.rm = TRUE),
-      0
-    ),
-    llm_temperature_llm = ifelse(
-      llm_active,
-      llm_temperature - mean(llm_temperature[llm_active], na.rm = TRUE),
-      0
-    )
-  )
-
-```
 
 
 ### Descriptive plots
+
+
+```{r}
+descriptive_barchart(simulation, metadata, papers_found, y_axis = 100)
+```
 
 #### Bar chart of number of relevant records found per dataset and condition
 
 ```{r}
 
-descriptive_barchart(simulation, metadata, recall_at_100)
+#scatterplot of the relationship between meand and (binomial) variance per dataset
+ggplot(simulation %>%
+         #filter(condition != "no_initialisation") %>%
+         group_by(dataset, condition) %>%
+         summarise(
+           p_hat = mean(papers_found / n_trials),
+           var_obs = var(papers_found / n_trials),
+           var_binom_expected = p_hat * (1 - p_hat) * mean(1 / n_trials),
+           .groups = "drop"
+         ),
+       aes(x = p_hat, y = var_obs, color = condition)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "black") + # y=x line
+  geom_line(aes(y = var_binom_expected), linetype = "dotted", linewidth = 1) + # binomial variance line
+  labs(
+    title = "Mean vs observed variance of papers found per dataset and condition",
+    x = "Mean proportion of papers found",
+    y = "Observed variance of proportion of papers found"
+  ) +
+  theme_minimal()
 
 ```
 
+The means and variances of the number of relevant records found per condition confirm that there is overdispersion in the data, as the variances are much larger than the means in all conditions (about 20 times!). This suggests that a simple Poisson or binomial model may not be appropriate for analyzing this data, and that we should consider using models that can account for overdispersion. Moreover, the degree of overdispersion (or more simply put, the variance) differs per condition, with the 'cold start' condition showing much more notably variance than the other conditions. This suggests that simply adding an overdispersion parameter to a Poisson or binomial model may not be sufficient.
+
+Scanning the table of frequencies of papers found per condition, two things pop-out. First that there are many zero's, and second that the rows seems to correlate between conditions. That is, the data seems to be multi-modal.
+
+```{r}
+p <- ggplot(simulation, aes(x = papers_found / n_trials, fill = condition)) +
+  geom_histogram(position = "dodge", bins = 30, alpha = 0.7) +
+  labs(
+    title = "Distribution of number of relevant records found by condition",
+    x = "Relevant records found (X) divided by number of trials (n <=100)",
+    y = "Count"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background  = element_rect(fill = "white", color = NA),
+    legend.background = element_rect(fill = "white", color = NA),
+    legend.key = element_rect(fill = "white", color = NA),
+    plot.margin = margin(10, 20, 10, 10)
+  )
+
+# Show in R *with* title
+p
+
+# Export *without* title
+ggsave(
+  filename = here::here("Report/results/papers_found_histogram.png"),
+  plot = p + labs(title = NULL),     # or + theme(plot.title = element_blank())
+  width = 10,
+  height = 6,
+  dpi = 300
+)
+
+```
+
+Indeed, the data has a large peak at zero and is multi-modal, with peaks at certain values of papers found. This may be simply correspond to different datasets having a different average number of papers found, leading to multiple overlapping distributions when all datasets are combined. To investigate this further, we can plot separate histograms for each dataset.
+
+
+```{r}
+
+# 1) Build a list of plots (one per dataset)
+dataset_names <- unique(simulation$dataset)
+
+plots <- lapply(dataset_names, function(dataset_name) {
+  ggplot(simulation %>% filter(dataset == dataset_name),
+         aes(x = papers_found / n_trials, fill = condition)) +
+    geom_histogram(position = "dodge", bins = 30, alpha = 0.7) +
+    labs(
+      title = paste("N relevant records found by condition -", dataset_name),
+      x = "Relevant records found (X) divided by number of trials (n <=100)",
+      y = "Count"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold"),
+      panel.background = element_rect(fill = "white", color = NA),
+      plot.background  = element_rect(fill = "white", color = NA),
+      legend.background = element_rect(fill = "white", color = NA),
+      legend.key = element_rect(fill = "white", color = NA),
+      plot.margin = margin(10, 20, 10, 10)
+    )
+})
+
+# 2) Write to a multi-page PDF with 4 plots per page
+pdf("..\\results\\papers_found_histograms.pdf", width = 11, height = 8.5, onefile = TRUE)
+
+for (i in seq(1, length(plots), by = 4)) {
+  page_plots <- plots[i:min(i + 3, length(plots))]
+  print(patchwork::wrap_plots(page_plots, ncol = 2, nrow = 2))
+}
+
+dev.off()
+
+```
+
+The dataset-specific histograms generally seem to fit a binomial distribution quite well. However, there are a few noteworthy extra sources of variation apparently present in the data:
+(1) The means differ substantially between datasets, leading to a wide range of distributions when all datasets are combined (i.e., we're dealing with multi-level data).
+(2) Some datasets show a peak at zero, indicating that in some runs no relevant records were found within the first 100 screened records. This could be due to the active learning model not being able to learn effectively from the (lack of) priors in those runs.
+(3) Some datasets show multiple peaks, suggesting that there may be subgroups of runs with different characteristics (e.g., different initializations or random seeds) that lead to different performance levels. This is especially true in the 'no_initialisation' condition. This multi-modality makes sense in light of the data-generating mechanism: if by chance relevant papers are found early on, the model can learn from them and find more relevant papers, leading to a higher number of papers found. Conversely, if no relevant papers are found early on, the model may struggle to learn and find fewer relevant papers.
+All three factors may explain the overdispersion observed in the combined data.
+
+
+Besides the above mentioned reasons for overdispersion, the dataset-split histograms also show reasons to believe that some condition x dataset combinations have little to no variance at all (e.g., all runs found 0 papers, or all runs found 10 papers). This may cause convergence issues in the models. To investigate this, we will check the number of unique values of papers found per condition and dataset.
+
+```{r}
+
+unique_value_table <- simulation %>%
+  group_by(dataset, condition) %>%
+  summarise(
+    n_unique_values = n_distinct(papers_found),
+    .groups = "drop"
+  )
+
+unique_value_table
+
+unique_value_table %>%
+  filter(n_unique_values <= 2)
+
+#return the rows from simulation corresponding to these dataset-condition combinations
+problematic_combinations <- unique_value_table %>%
+  filter(n_unique_values <= 2) %>%
+  select(dataset, condition)
+
+problematic_combinations <- merge(simulation, problematic_combinations, by = c("dataset", "condition"))
+
+problematic_combinations %>%
+  filter(dataset == "Radjenovic_2013")
+
+fraction_found <- simulation %>%
+  mutate(fraction_found = papers_found / n_trials)
+```
+
+There seem to be problems with in particular with the Donners 2021 and Leenaars 2019 dataset, which both have 2 or less unique runs in 3/4 conditions (the cold start conditions being the exception in both cases). Furthermore, the inclusion-criteria decision resulted in 2 or less unique runs for Radjenovic_2013, Smid_2020, Wolters_2018 and van_der_Waal_2022. This might cause convergence problems when trying to fit more complex models (i.e., with condition-specific dispersion factors).
 
 ## Data Analysis
 
 ### Checking assumptions
 
-
 ```{r}
 #check the assumption of homogeneity of variance across conditions
-ggplot(simulation, aes(x = condition, y = papers_found)) +
+ggplot(simulation, aes(x = condition, y = papers_found / n_trials)) +
   geom_boxplot() +
   geom_jitter(width = 0.1, alpha = .3)
 
 #calculate Levene's test for homogeneity of variance
-car::leveneTest(papers_found ~ condition, data = simulation) # not significant, so homogeneity of variance assumption met
+car::leveneTest(papers_found / n_trials ~ condition, data = simulation) # not significant, so homogeneity of variance assumption met
 
 ```
-There seems to be little variance in the 'criteria' condition within datasets. This makes sense since the other three conditions have additional sources of randomness (llm: LLM outputs, no_initialisation and random: random sampling). The 'criteria' condition always starts with the same two relevant records (the criteria), which likely leads to more similar performance across runs. So, even though Levene's test indicates that the homogeneity of variance assumption is met, the visualization suggests that there may be some heterogeneity of variance specifically between the criteria condition and the other conditions. Thus this comparison should be interpreted with caution.
+There seems to be little variance in the 'criteria' condition within datasets. This makes sense since the other three conditions have additional sources of randomness (llm: LLM outputs, no_initialisation and random: random sampling). The 'criteria' condition always starts with the same two relevant records (the criteria), which likely leads to more similar performance across runs. Indeed, Levene's test indicates that the homogeneity of variance assumption is violated. We should thus consider modeling different residual variances per condition.
 
 Variance across runs in the other conditions is due to variation in priors, not to model stochasticity.
 
-```{r, run=FALSE}}
-# check the assumption of linearity between percentage and relevant records found
-ggplot(simulation,
-       aes(x = percent_rel, y = papers_found)) +
-  geom_point(alpha = 0.6) +
-  geom_smooth(method = "lm",
-              aes(color = "linear"),
-              se = FALSE) +
-  geom_smooth(method = "lm",
-              formula = y ~ x + I(x^2),
-              aes(color = "quadratic"),
-              se = FALSE) +
-  labs(
-    title = "Percentage of relevant records vs. number of relevant records found",
-    x = "percentage of relevant records",
-    y = "Number of relevant records found in first 100 screened"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    panel.background = element_rect(fill = "white", color = NA),
-    plot.background  = element_rect(fill = "white", color = NA),
-    legend.background = element_rect(fill = "white", color = NA),
-    legend.key = element_rect(fill = "white", color = NA),
-    plot.margin = margin(10, 20, 10, 10)
-  )
 
-# check the assumption of linearity between percentage and relevant records found
-ggplot(simulation,
-       aes(x = records, y = papers_found)) +
-  geom_point(alpha = 0.6) +
-  geom_smooth(method = "lm",
-              aes(color = "linear"),
-              se = FALSE) +
-  geom_smooth(method = "lm",
-              formula = y ~ x + I(x^2),
-              aes(color = "quadratic"),
-              se = FALSE) +
-  labs(
-    title = "Total number of records vs. number of relevant records found",
-    x = "Percentage of relevant records",
-    y = "Number of relevant records found in first 100 screened"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    panel.background = element_rect(fill = "white", color = NA),
-    plot.background  = element_rect(fill = "white", color = NA),
-    legend.background = element_rect(fill = "white", color = NA),
-    legend.key = element_rect(fill = "white", color = NA),
-    plot.margin = margin(10, 20, 10, 10)
-  )
-
-```
-
-
-
-# Mixed effects model
-
-A bottom-up modeling approach is used to build the mixed effects model. We start with an intercept-only model and subsequently add fixed effects and random slopes. At each step, we evaluate whether the addition of parameters significantly improves model fit using likelihood ratio tests
-
-###
+# Binomial multilevel
 
 ```{r}
 #set reference category for regression model
@@ -188,21 +257,331 @@ simulation <- simulation %>% mutate(condition = relevel(factor(condition), ref =
 ```
 
 
+```{r}
+library(emmeans)
 
-### Intercept only model
+
+```
+
 
 ```{r}
-model0 <- lmer(papers_found ~ 1 + (1|dataset), REML = F, data = simulation)
-summary(model0)
+
+normal_model_null <- lm(papers_found ~ condition, data = simulation)
+
+summary(normal_model_null)
+
 ```
 
 ```{r}
-Intercept_variances = as.data.frame(VarCorr(model0))
 
-ICC = Intercept_variances[Intercept_variances$grp == 'dataset','vcov'] / (Intercept_variances[Intercept_variances$grp == 'dataset','vcov'] + Intercept_variances[Intercept_variances$grp == 'Residual','vcov'])
+bin_model_null <- glm(cbind(papers_found, n_trials - papers_found) ~ condition,
+                family = binomial(link = "logit"),
+                data = simulation)
 
-print(ICC)
+summary(bin_model_null)
 ```
+```{r}
+#calculate the marginal effecs of condition on papers_found for the binomial model
+emm <- emmeans::emmeans(bin_model_null, ~ condition, type = "response")
+
+?emmeans
+
+emmeans::contrast(emm, method = "revpairwise") 
+
+emm
+```
+
+
+
+```{r}
+normal_model0 <- lme4::lmer(papers_found ~ n_trials + (1|dataset), data = simulation, REML = F)
+
+summary(normal_model0)
+
+```
+
+
+```{r}
+bin_model0 <- lme4::glmer(cbind(papers_found, n_trials - papers_found) ~ 1 + (1|dataset),
+                family = binomial(link = "logit"),
+                data = simulation,
+                control = lme4::glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun=2e5)))
+
+performance::icc(bin_model0) # adjusted means adjusted for fixed effects
+```
+
+
+```{r}
+bin_model_fixed <- glm(cbind(papers_found, n_trials - papers_found) ~ condition + dataset,
+                family = binomial(link = "logit"),
+                data = simulation)
+```
+
+```{r}
+emm <- emmeans::emmeans(bin_model_fixed, ~ condition, type = "response")
+emm
+```
+
+
+```{r}
+bin_model1 <- lme4::glmer(cbind(papers_found, n_trials - papers_found) ~ condition + (1|dataset),
+                family = binomial(link = "logit"),
+                data = simulation,
+                control = lme4::glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun=2e5)))
+
+summary(bin_model1)
+anova(bin_model1, bin_model0)
+performance::r2_nakagawa(bin_model1)
+```
+
+```{r}
+#calculate the marginal effecs of condition on papers_found for the binomial model
+emm <- emmeans::emmeans(bin_model1, ~ condition, type = "response")
+emm
+```
+
+
+```{r}
+simulationOutput_bin_model1 <- simulateResiduals(fittedModel = bin_model1, plot = F, n = 1000, re.form = NULL)
+
+DHARMa::testOutliers(simulationOutput_bin_model1, type = "bootstrap")
+plotQQunif(simulationOutput_bin_model1)
+plotResiduals(simulationOutput_bin_model1, form = simulation$condition)
+```
+
+```{r}
+
+betabin_model0 <- glmmTMB::glmmTMB(
+  cbind(papers_found, n_trials - papers_found) ~ 1 + (1|dataset),
+  family = glmmTMB::betabinomial(link = "logit"),
+  dispformula = ~ 1,
+  data = simulation
+)
+
+summary(betabin_model0)
+
+performance::icc(betabin_model0)
+```
+
+
+```{r}
+
+betabin_model1 <- glmmTMB::glmmTMB(
+  cbind(papers_found, n_trials - papers_found) ~ condition + (1|dataset),
+  family = glmmTMB::betabinomial(link = "logit"),
+  dispformula = ~ 1,
+  data = simulation
+)
+
+summary(betabin_model1)
+performance::r2_nakagawa(betabin_model1)
+
+
+# #conduct LRT between betabin_model0 and bin_model0 manually by extracting chi-squared
+# Chi_sq = 2 * (logLik(betabin_model1) - logLik(bin_model1))
+# p_value = pchisq(Chi_sq, df = attr(logLik(betabin_model1), "df") - attr(logLik(bin_model1), "df"), lower.tail = FALSE)
+# print(p_value)
+
+#performance::icc(betabin_model0)
+```
+
+```{r}
+simulationOutput_betabin_model0 <- simulateResiduals(fittedModel = betabin_model0, plot = F, n = 1000, re.form = NULL)
+
+DHARMa::testOutliers(simulationOutput_betabin_model0, type = "bootstrap")
+plotQQunif(simulationOutput_betabin_model0)
+plotResiduals(simulationOutput_betabin_model0, form = simulation$condition)
+
+plotResiduals(simulationOutput_betabin_model0, simulation$dataset)
+testZeroInflation(simulationOutput_betabin_model0)
+```
+
+
+```{r}
+betabin_model2 <- glmmTMB::glmmTMB(
+  cbind(papers_found, n_trials - papers_found) ~ condition + (1|dataset),
+  family = glmmTMB::betabinomial(link = "logit"),
+  dispformula = ~ 1,
+  ziformula = ~1, 
+  data = simulation
+)
+
+summary(betabin_model2)
+anova(betabin_model2, betabin_model1)
+performance::r2_nakagawa(betabin_model2)
+```
+
+```{r}
+#calculate the marginal effecs of condition on papers_found for the betabinomial model
+emm <- emmeans::emmeans(betabin_model2, ~ condition, type = "response")
+emm
+```
+
+
+```{r}
+simulationOutput_betabin_model1 <- simulateResiduals(fittedModel = betabin_model1, plot = F, n = 1000, re.form = NULL)
+
+DHARMa::testOutliers(simulationOutput_betabin_model1, type = "bootstrap")
+plotQQunif(simulationOutput_betabin_model1)
+plotResiduals(simulationOutput_betabin_model1, form = simulation$condition)
+
+plotResiduals(simulationOutput_betabin_model1, simulation$dataset)
+testZeroInflation(simulationOutput_betabin_model1)
+```
+
+
+```{r}
+nat_coefs <- summary(betabin_model1)$coefficients$cond
+
+plogis(nat_coefs[1,1]) # the probability of finding a relevant record in the 'llm' condition
+plogis(nat_coefs[1,1] + nat_coefs[2,1]) # the probability for the 'cold start' condition
+plogis(nat_coefs[1,1] + nat_coefs[3,1]) # the probability for the 'criteria' condition
+plogis(nat_coefs[1,1] + nat_coefs[4,1]) # the probability for the 'random' condition
+
+
+exp(summary(betabin_model1)$coefficients$cond[c(2,3,4),1]) # odds ratios for other conditions compared to 'llm'
+```
+
+
+
+```{r adding within-dataset predictors}
+
+betabin_model3 <- glmmTMB::glmmTMB(
+  cbind(papers_found, n_trials - papers_found) ~ condition + n_abstracts_llm + length_abstracts_llm + llm_temperature_llm + (1|dataset),
+  family = glmmTMB::betabinomial(link = "logit"),
+  dispformula = ~ 1,
+  ziformula = ~ 1, 
+  data = simulation
+)
+
+summary(betabin_model3)
+anova(betabin_model3, betabin_model2)
+
+```
+
+
+```{r}
+nat_coefs <- summary(betabin_model2)$coefficients$cond
+
+plogis(nat_coefs[1,1]) # the probability of finding a relevant record in the 'llm' condition
+plogis(nat_coefs[1,1] + nat_coefs[2,1]) # the probability for the 'cold start' condition
+plogis(nat_coefs[1,1] + nat_coefs[3,1]) # the probability for the 'criteria' condition
+plogis(nat_coefs[1,1] + nat_coefs[4,1]) # the probability for the 'random' condition
+
+
+exp(summary(betabin_model2)$coefficients$cond[c(2,3,4),1]) # odds ratios for other conditions compared to 'llm'
+```
+
+
+```{r adding between-dataset predictors}
+
+betabin_model4 <- glmmTMB::glmmTMB(
+  cbind(papers_found, n_trials - papers_found) ~ 
+    condition + 
+    n_abstracts_llm + 
+    (1|dataset),
+  family = glmmTMB::betabinomial(link = "logit"),
+  dispformula = ~ 1,
+  ziformula = ~ 1, 
+  data = simulation
+)
+
+summary(betabin_model4)
+anova(betabin_model4, betabin_model3)
+
+```
+
+
+```{r adding random effects / slopes}
+
+betabin_model5 <- glmmTMB::glmmTMB(
+  cbind(papers_found, n_trials - papers_found) ~ 
+    condition + 
+    n_abstracts_llm + 
+    (1|dataset) + (0 + condition|dataset),
+  family = glmmTMB::betabinomial(link = "logit"),
+  dispformula = ~ 1,
+  ziformula = ~ 1, 
+  data = simulation
+)
+
+summary(betabin_model5)
+anova(betabin_model5, betabin_model4)
+performance::r2_nakagawa(betabin_model5)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+K <- 4 # number of conditions
+phi0 <- sigma(betabin_model1)
+
+start_disp <- rep(log(phi0), K)
+
+betabin_model2 <- glmmTMB::glmmTMB(
+  cbind(papers_found, 100 - papers_found) ~ condition + (1|dataset),
+  dispformula = ~ condition,
+  family = glmmTMB::betabinomial(link = "logit"),
+  data = simulation,
+  start = list(betadisp = start_disp)
+)
+
+summary(betabin_model2)
+
+
+glmmTMB::diagnose(betabin_model2)
+
+
+
+var_dat_cond_combi <- simulation %>%
+                    group_by(condition, dataset) %>%
+                    summarise(
+                      n = n(),
+                      min_y = min(papers_found),
+                      max_y = max(papers_found),
+                      sd_y  = sd(papers_found),
+                      .groups="drop"
+                    ) %>%
+                    arrange(sd_y)
+
+
+
+#export aggregate table to pdf
+writeLines(capture.output(knitr::kable(var_dat_cond_combi, digits = 3)), here::here("Report/results/overdispersion_table.tex"))
+
+```
+
+
+
+# Gaussian multilevel model
+
+A bottom-up modeling approach is used to build the mixed effects model. We start with an intercept-only model and subsequently add fixed effects and random slopes. At each step, we evaluate whether the addition of parameters significantly improves model fit using likelihood ratio tests
+
+
+
+
 
 <!-- #### Grand mean centering -->
 
@@ -232,44 +611,20 @@ print(ICC)
 <!-- The random variance components of the two models  -->
 
 
-```{r}
-
-model1 <- lmer(papers_found ~ condition  + (1|dataset), REML = F, data = simulation)
-summary(model1)
-anova(model1, model0)
-```
 
 
 
 
-```{r}
-
-model2 <- lmer(papers_found ~ condition + n_abstracts_llm + length_abstracts_llm + llm_temperature_llm + (1|dataset), REML = F, data = simulation)
-summary(model2)
-anova(model2, model1)
-```
-
-
-15742    
-
-```{r}
-model3 <- lmer(papers_found ~ condition + percent_rel + (1|dataset), REML = F, data = simulation)
-summary(model3)
-anova(model3, model1)
-```
-
-```{r}
-model4 <- lmer(papers_found ~ condition + percent_rel + (condition|dataset), REML = F, data = simulation)
-summary(model4)
-anova(model4, model3)
-```
 
 The negative correlations between the random intercepts and random slopes indicate that in datasets where performance under the reference condition (LLM) is higher than average, the drop in performance when using minimal or no_priors instead of LLM is larger than average. In other words, the effect of initialization was more pronounced for datasets where the overall performance was higher in general. Some datasets are simply easier for the active learning model of ASReview: many relevant records can be found early. In those ‘easier’ datasets, LLM-based initialization tends to create an especially large advantage over minimal or no_priors, which is reflected in the strong negative correlations between the random intercept and the random slopes.
 
 ```{r}
-model5 <- lmer(papers_found ~ condition + percent_rel + condition*records + (condition|dataset), REML = F, data = simulation)
+model5 <- lme4::lmer(papers_found ~ condition + percent_rel + condition*records + (condition|dataset), REML = F, data = simulation)
 summary(model5)
 anova(model5, model4)
+
+simulationOutput_normel_model5 <- simulateResiduals(fittedModel = model5, plot = F)
+plotResiduals(simulationOutput_normel_model5, simulation$dataset)
 ```
 
 ### Checking normality of residuals
@@ -279,49 +634,19 @@ anova(model5, model4)
 qqnorm(residuals(model5))
 
 #plot QQ plots of random means
-qqnorm(ranef(model5)$dataset[,1])
+qqnorm(lme4::ranef(model5)$dataset[,1])
 
 #plot QQ plots of random effect with no initialization condition 
-qqnorm(ranef(model5)$dataset[,2])
+qqnorm(lme4::ranef(model5)$dataset[,2])
 
 #plot QQ plots of random effect with random initialization condition
-qqnorm(ranef(model5)$dataset[,3])
+qqnorm(lme4::ranef(model5)$dataset[,3])
 ```
 
 The residuals and random effects do not seem to be normally distributed. 
 
 
-### Is number of relevant records found a limited measure of starting performance?
 
-```{r}
-# calculate recall at 100 for each run
-simulation <- simulation %>%
-  mutate(
-    recall_at_100 = papers_found / included * 100
-  )
-
-#the percentage of runs which have perfect recall
-percent_perfect_recall <- simulation %>%
-  group_by(condition) %>%
-  summarise(
-    percent_perfect_recall = mean(recall_at_100 == 100) * 100
-  )
-percent_perfect_recall
-
-#calculate variation in recall at 100 per condition
-variation_recall <- simulation %>%
-  group_by(condition) %>%
-  summarise(
-    sd_recall_at_100 = sd(recall_at_100)
-  )
-variation_recall
-
-#join the two tables
-recall_summary <- percent_perfect_recall %>%
-  left_join(variation_recall, by = "condition")
-
-recall_summary
-```
 
 
 
@@ -357,7 +682,7 @@ writeLines(perfect_recall_text, here::here("Report/results/perfect_recall_text.t
 
 ## Model results
 
-```{r}
+```{r, echo = F, run = F}
 
 p_apa <- function(p) ifelse(is.na(p), "NA", ifelse(p < .001, "$p$ < .001", sprintf("$p$ = %.3f", p)))
 
@@ -371,27 +696,27 @@ options(scipen = 999)
 latex_text <- paste0(
   "We fit a linear regression to examine whether initialization affected the number of ",
   "relevant records found within the first 100 screenings. ",
-  "The LLM-initialized model yielded on average \\textit{B} = ", round(summary_basic$coefficients[1, 1],2),
-  ", \\textit{SE} = ", round(summary_basic$coefficients[1, 2],2),
-  ", \\textit{t} = ", round(summary_basic$coefficients[1, 3],2),
+  "The LLM-initialized model yielded on average \\textit{B} = ", round(summary(model5)$coefficients[1, 1],2),
+  ", \\textit{SE} = ", round(summary(model5)$coefficients[1, 2],2),
+  ", \\textit{t} = ", round(summary(model5)$coefficients[1, 3],2),
   ". ",
 
   "Interestingly, this is approximately equal to number of papers found in the random-initialization condition, at a difference of:, ",
-  "\\textit{B} = ", round(summary_basic$coefficients[2, 1],2),
-  ", \\textit{SE} = ", round(summary_basic$coefficients[2, 2],2),
-  ", \\textit{t} = ", round(summary_basic$coefficients[2, 3],2),
-  ", ", p_apa(summary_basic$coefficients[2, 4]),
+  "\\textit{B} = ", round(summary(model5)$coefficients[2, 1],2),
+  ", \\textit{SE} = ", round(summary(model5)$coefficients[2, 2],2),
+  ", \\textit{t} = ", round(summary(model5)$coefficients[2, 3],2),
+  #", ", p_apa(summary(model5)$coefficients[2, 4]),
   ". ",
   
   "In contrast, the difference between the LLM-initialization and the no-initialization conditions was statistically significant: ",
-  "\\textit{B} = ", round(summary_basic$coefficients[3, 1],2),
-  ", \\textit{SE} = ", round(summary_basic$coefficients[3, 2],2),
-  ", \\textit{t} = ", round(summary_basic$coefficients[3, 3],2),
-  ", ", p_apa(summary_basic$coefficients[3, 4]),
+  "\\textit{B} = ", round(summary(model5)$coefficients[3, 1],2),
+  ", \\textit{SE} = ", round(summary(model5)$coefficients[3, 2],2),
+  ", \\textit{t} = ", round(summary(model5)$coefficients[3, 3],2),
+  #", ", p_apa(summary(model5)$coefficients[3, 4]),
   ".\n",
-  "Overall model fit was $R^2$ = ", round(summary_basic$r.squared,2),
-  ", adjusted $R^2$ = ", round(summary_basic$adj.r.squared,2),
-  ", and $F(", Df1, ", ", Df2, ")$ = ", round(summary_basic$fstatistic[1],2),
+  "Overall model fit was $R^2$ = ", round(summary(model5)$r.squared,2),
+  ", adjusted $R^2$ = ", round(summary(model5)$adj.r.squared,2),
+  ", and $F(", Df1, ", ", Df2, ")$ = ", round(summary(model5)$fstatistic[1],2),
   ", \\textit{p} = ", p_apa(anova_basic$'Pr(>F)'[1]), "."
 )
 
@@ -403,8 +728,8 @@ writeLines(latex_text, "../Report/results/results_paragraph.tex")
 
 
 ```{r}
-subset(as.data.frame(VarCorr(model2)), grp == "dataset")$vcov
-subset(as.data.frame(VarCorr(model2)), grp == "Residual")$vcov
+subset(as.data.frame(lme4::VarCorr(model2)), grp == "dataset")$vcov
+subset(as.data.frame(lme4::VarCorr(model2)), grp == "Residual")$vcov
 ```
 
 ```{r}
@@ -413,32 +738,317 @@ random_effects <- function(model){
   
   round_to = 3
   
-  if (nrow(as.data.frame(VarCorr(model))) == 2) {
+  if (nrow(as.data.frame(lme4::VarCorr(model))) == 2) {
     
     return(
       list(
-        residual_var = round(subset(as.data.frame(VarCorr(model)), grp == "Residual")$vcov, round_to),
-        intercept_var= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$vcov, round_to)
+        residual_var = round(subset(as.data.frame(lme4::VarCorr(model)), grp == "Residual")$vcov, round_to),
+        intercept_var= round(subset(as.data.frame(lme4::VarCorr(model)), grp == "dataset")$vcov, round_to)
         
       )
     )
   }
   else {
     list(
-      residual_var = round(subset(as.data.frame(VarCorr(model)), grp == "Residual")$vcov, round_to),
-      intercept_var= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$vcov[1], round_to),
-      random_init_var= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$vcov[2], round_to),
-      no_init_var= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$vcov[3], round_to),
-      cor_random_init_intercept= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$sdcor[4], round_to),
-      cor_no_init_intercept= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$sdcor[5], round_to),
-      cor_no_init_random_init= round(subset(as.data.frame(VarCorr(model)), grp == "dataset")$sdcor[6], round_to)
+      residual_var = round(subset(as.data.frame(lme4::VarCorr(model)), grp == "Residual")$vcov, round_to),
+      intercept_var= round(subset(as.data.frame(lme4::VarCorr(model)), grp == "dataset")$vcov[1], round_to),
+      random_init_var= round(subset(as.data.frame(lme4::VarCorr(model)), grp == "dataset")$vcov[2], round_to),
+      no_init_var= round(subset(as.data.frame(lme4::VarCorr(model)), grp == "dataset")$vcov[3], round_to),
+      cor_random_init_intercept= round(subset(as.data.frame(lme4::VarCorr(model)), grp == "dataset")$sdcor[4], round_to),
+      cor_no_init_intercept= round(subset(as.data.frame(lme4::VarCorr(model)), grp == "dataset")$sdcor[5], round_to),
+      cor_no_init_random_init= round(subset(as.data.frame(lme4::VarCorr(model)), grp == "dataset")$sdcor[6], round_to)
     )
   }
 }
 
-random_effects(model4)
+random_effects(betabin_model5)
 
 ```
+
+
+
+```{r}
+random_effects_glmmTMB <- function(model, grp = "dataset", round_to = 3) {
+  vc <- glmmTMB::VarCorr(model)
+
+  # Conditional (i.e., mean-model) random effects for the grouping factor
+  cond_grp <- vc$cond[[grp]]
+  if (is.null(cond_grp)) {
+    stop(sprintf("No conditional random effects found for group '%s'.", grp))
+  }
+
+  # glmmTMB stores:
+  # - variances/covariances in cond_grp (a matrix-like object)
+  # - correlations in attr(cond_grp, "correlation") (may be NULL)
+  V   <- as.matrix(cond_grp)
+  Cor <- attr(cond_grp, "correlation")
+
+  # Name helper: glmmTMB uses "(Intercept)" for intercept
+  rn <- rownames(V)
+
+  out <- list(
+    intercept_var = round(V["(Intercept)", "(Intercept)"], round_to)
+  )
+
+  # Residual / dispersion: depends on family; for non-Gaussian it isn't a simple "Residual var"
+  # We return it when available in VarCorr(), otherwise NA
+  out$residual_var <- NA_real_
+  if (!is.null(vc$disp)) {
+    # For Gaussian this corresponds to residual variance; for others it's a dispersion-related quantity
+    out$residual_var <- round(as.numeric(vc$disp), round_to)
+  }
+
+  # If random slopes exist, add their variances + correlations with intercept and between slopes
+  slopes <- setdiff(rn, "(Intercept)")
+  if (length(slopes) > 0) {
+    # Variances of slopes
+    for (s in slopes) {
+      nm <- paste0(make.names(s), "_var")
+      out[[nm]] <- round(V[s, s], round_to)
+    }
+
+    # Correlations (if available)
+    if (!is.null(Cor)) {
+      # intercept-slope corrs
+      for (s in slopes) {
+        nm <- paste0("cor_", make.names(s), "_intercept")
+        out[[nm]] <- round(Cor[s, "(Intercept)"], round_to)
+      }
+
+      # slope-slope corrs (upper triangle)
+      if (length(slopes) > 1) {
+        for (i in seq_along(slopes)) {
+          for (j in seq_along(slopes)) {
+            if (j > i) {
+              s1 <- slopes[i]; s2 <- slopes[j]
+              nm <- paste0("cor_", make.names(s1), "_", make.names(s2))
+              out[[nm]] <- round(Cor[s1, s2], round_to)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  out
+}
+
+# usage
+random_effects_glmmTMB(betabin_model4, grp = "dataset")
+
+```
+
+```{r}
+random_effects <- function(model, grp = "dataset", round_to = 3) {
+
+  # lme4 -----------------------------------------------------------------------
+  if (inherits(model, "merMod")) {
+    vc <- as.data.frame(lme4::VarCorr(model))
+
+    # intercept + (optional) slopes: lme4 stores them in the same grp
+    vc_grp <- subset(vc, grp == grp)
+
+    out <- list(
+      sd_intercept = round(vc_grp$sdcor[vc_grp$var1 == "(Intercept)" & is.na(vc_grp$var2)], round_to)
+    )
+
+    # residual variance exists only for gaussian; for binomial it’s not comparable
+    out$sd_residual <- if ("Residual" %in% vc$grp) round(subset(vc, grp == "Residual")$sdcor, round_to) else NA_real_
+
+    # slopes if present
+    slopes <- vc_grp$var1[vc_grp$var1 != "(Intercept)" & is.na(vc_grp$var2)]
+    if (length(slopes) > 0) {
+      for (s in slopes) out[[paste0("sd_", make.names(s))]] <- round(vc_grp$sdcor[vc_grp$var1 == s & is.na(vc_grp$var2)], round_to)
+    }
+
+    # correlations (lme4 puts them in sdcor where var2 is not NA)
+    vc_cor <- subset(vc_grp, !is.na(var2))
+    if (nrow(vc_cor) > 0) {
+      for (k in seq_len(nrow(vc_cor))) {
+        nm <- paste0("cor_", make.names(vc_cor$var1[k]), "_", make.names(vc_cor$var2[k]))
+        out[[nm]] <- round(vc_cor$sdcor[k], round_to)
+      }
+    }
+
+    return(out)
+  }
+
+  # glmmTMB -------------------------------------------------------------------
+  if (inherits(model, "glmmTMB")) {
+    vc <- glmmTMB::VarCorr(model)
+    G  <- vc$cond[[grp]]
+    if (is.null(G)) stop(sprintf("No conditional random effects found for group '%s'.", grp))
+
+    V   <- as.matrix(G)
+    Cor <- attr(G, "correlation")
+    rn  <- rownames(V)
+
+    out <- list(
+      sd_intercept = round(sqrt(V["(Intercept)", "(Intercept)"]), round_to)
+    )
+
+    slopes <- setdiff(rn, "(Intercept)")
+    if (length(slopes) > 0) {
+      for (s in slopes) out[[paste0("sd_", make.names(s))]] <- round(sqrt(V[s, s]), round_to)
+    }
+
+    if (!is.null(Cor) && length(slopes) > 0) {
+      # intercept–slope correlations
+      for (s in slopes) out[[paste0("cor_", make.names(s), "_Intercept")]] <- round(Cor[s, "(Intercept)"], round_to)
+
+      # slope–slope correlations
+      if (length(slopes) > 1) {
+        for (i in seq_along(slopes)) for (j in seq_along(slopes)) if (j > i) {
+          s1 <- slopes[i]; s2 <- slopes[j]
+          out[[paste0("cor_", make.names(s1), "_", make.names(s2))]] <- round(Cor[s1, s2], round_to)
+        }
+      }
+    }
+
+    # dispersion parameter: meaningful for beta-binomial; ~1 for binomial
+    out$dispersion <- round(as.numeric(sigma(model)), round_to)
+
+    return(out)
+  }
+
+  stop("Model class not supported.")
+}
+
+```
+
+
+```{r}
+get_fixef_table <- function(model) {
+  if (inherits(model, "merMod")) {
+    co <- summary(model)$coefficients
+    return(list(
+      est = co[, "Estimate"],
+      se  = co[, "Std. Error"],
+      p   = co[, "Pr(>|z|)"]
+    ))
+  }
+
+  if (inherits(model, "glmmTMB")) {
+    co <- summary(model)$coefficients$cond
+    # glmmTMB uses Pr(>|z|) too
+    return(list(
+      est = co[, "Estimate"],
+      se  = co[, "Std. Error"],
+      p   = co[, "Pr(>|z|)"]
+    ))
+  }
+
+  stop("Model class not supported.")
+}
+
+# align coefficients across models to the same term set (important for stargazer)
+align_terms <- function(x, terms) {
+  est <- setNames(rep(NA_real_, length(terms)), terms); est[names(x$est)] <- x$est
+  se  <- setNames(rep(NA_real_, length(terms)), terms);  se[names(x$se)]  <- x$se
+  p   <- setNames(rep(NA_real_, length(terms)), terms);   p[names(x$p)]   <- x$p
+  list(est = est, se = se, p = p)
+}
+
+```
+
+```{r}
+terms <- c(
+  "(Intercept)",
+  "conditionrandom",
+  "conditionno_initialisation",
+  "conditioncriteria",
+  "n_abstracts_llm"
+)
+```
+
+
+```{r MIDTERM REPORT}
+
+models <- list(bin_model1, betabin_model1, betabin_model2, betabin_model5)
+
+fx <- lapply(models, get_fixef_table)
+fx <- lapply(fx, align_terms, terms = terms)
+
+coefs <- lapply(fx, `[[`, "est")
+ses   <- lapply(fx, `[[`, "se")
+ps    <- lapply(fx, `[[`, "p")
+
+re <- lapply(models, random_effects)
+
+AICs <- sapply(models, AIC)
+LLs  <- sapply(models, function(m) as.numeric(logLik(m)))
+
+# ΔAIC relative to the first model (or best; your choice)
+dAIC <- round(AICs - AICs[1], 2)
+
+stargazer::stargazer(
+  # You can pass just the first model object (for template), because we override coef/se/p
+  models[[1]], models[[2]], models[[3]], models[[4]],
+  type = "latex",
+  title = "The effect of initialisation on starting performance",
+  dep.var.labels = "Outcome: number of relevant records per number of trials",
+
+  covariate.labels = c(
+    "\\multirow{2}{*}{\\shortstack[l]{Criteria\\\\Condition}}",
+    "\\multirow{2}{*}{\\shortstack[l]{Cold Start\\\\Condition}}",
+    "\\multirow{2}{*}{\\shortstack[l]{True Examples\\\\Condition}}",
+    "\\multirow{2}{*}{\\shortstack[l]{Number of \\\\ abstracts}}",
+    "\\multirow{2}{*}{\\shortstack[l]{Length \\\\ abstracts}}",
+    "\\multirow{2}{*}{\\shortstack[l]{LLM \\\\ temperature.}}",
+    "\\multirow{2}{*}{\\shortstack[l]{\\% relevant records}}",
+    "\\multirow{2}{*}{\\shortstack[l]{LLM\\\\Condition}}"
+  ),
+
+  # coef = coefs,
+  # se   = ses,
+  # p    = ps,
+
+  add.lines = list(
+    c("$\\mathrm{SD}(u_{0j})$", re[[1]]$sd_intercept, re[[2]]$sd_intercept, re[[3]]$sd_intercept, re[[4]]$sd_intercept),
+
+    # # random slopes only present in model 4 (betabin_model5)
+    # c("$\\mathrm{SD}(u_{1j})$", "", "", "", re[[4]]$sd_conditioncriteria %||% ""),
+    # c("$\\mathrm{SD}(u_{2j})$", "", "", "", re[[4]]$sd_conditionno_initialisation %||% ""),
+    # 
+    # # correlations (names depend on your slope terms; adjust once you see output names)
+    # c("$\\rho(u_{1j}, u_{2j})$", "", "", "", re[[4]]$cor_conditioncriteria_conditionno_initialisation %||% ""),
+
+    # dispersion (meaningful for glmmTMB; blank for lme4 binomial)
+    c("Dispersion ($\\sigma$)", "", re[[2]]$dispersion %||% "", re[[3]]$dispersion %||% "", re[[4]]$dispersion %||% ""),
+
+    c("AIC", round(AICs, 2)),
+    c("$\\Delta$AIC (vs Model 1)", dAIC),
+    c("logLik", round(LLs, 2))
+  ),
+
+  keep.stat = NULL,          # we add AIC/logLik ourselves to avoid method issues
+  star.cutoffs = NA,
+  notes.align = "l",
+  notes.label = "",
+  notes = c(
+    "All models include condition fixed effects; models differ in distributional assumptions and random-effects structure.",
+    "Dispersion ($\\sigma$) is reported for glmmTMB models (meaningful for beta-binomial).",
+    "$^{*} p<0.1; ^{**} p<0.05; ^{***} p<0.01$"
+  ),
+  notes.append = FALSE,
+  header = TRUE,
+  out = here::here("Report/results/results_table_midterm.tex")
+)
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
 
 
 ```{r}
@@ -452,7 +1062,7 @@ p_to_stars <- function(p) {
 }
 
 
-stargazer(
+stargazer::stargazer(
   model1, model2, model3, model4, model5,
   # column.labels = c("Conds", "Within", "Between", "Rand effects", "Interactions"),
   # column.separate = c(1, 1, 1, 1, 1),
@@ -558,9 +1168,159 @@ stargazer(
 
 
 
+```{r}
+
+p_to_stars <- function(p) {
+  if (is.na(p)) return("")
+  if (p < 0.001) return("***")
+  if (p < 0.01)  return("**")
+  if (p < 0.05)  return("*")
+  ""
+}
+
+
+stargazer::stargazer(
+  model1, model2, model3, model4,
+  # column.labels = c("Conds", "Within", "Between", "Rand effects", "Interactions"),
+  # column.separate = c(1, 1, 1, 1, 1),
+  type = "latex",
+  title = "Effect of initialisation on the number relevant records found in first 100 screened",
+  dep.var.labels = "Outcome: number of records found",
+  covariate.labels = c(
+    "\\multirow{2}{*}{\\shortstack[l]{Criteria\\\\Condition}}",
+    "\\multirow{2}{*}{\\shortstack[l]{Cold Start\\\\Condition}}",
+    "\\multirow{2}{*}{\\shortstack[l]{True Examples\\\\Condition}}",
+    "\\multirow{2}{*}{\\shortstack[l]{Number of \\\\ abstracts}}",
+    "\\multirow{2}{*}{\\shortstack[l]{Length \\\\ abstracts}}",
+    "\\multirow{2}{*}{\\shortstack[l]{LLM \\\\ temperature.}}",
+    "\\multirow{2}{*}{\\shortstack[l]{\\% relevant records}}",
+    "\\multirow{2}{*}{\\shortstack[l]{LLM\\\\Condition}}"
+  ),
+  add.lines = list(
+    
+    c("$\\mathrm{Var}(u_{0j})$",
+      random_effects(model1)$intercept_var, 
+      random_effects(model2)$intercept_var, 
+      random_effects(model3)$intercept_var, 
+      random_effects(model4)$intercept_var
+      ),
+    
+    c("$\\mathrm{Var}(u_{1j})$",
+      "", 
+      "", 
+      "", 
+      random_effects(model4)$random_init_var
+      ),
+    
+    c("$\\mathrm{Var}(u_{2j})$",
+      "",
+      "",
+      "",
+      random_effects(model4)$no_init_var
+      ),
+    
+        c("$\\mathrm{Var}(\\varepsilon_{ij})$",
+      random_effects(model1)$residual_var, 
+      random_effects(model2)$residual_var, 
+      random_effects(model3)$residual_var, 
+      random_effects(model4)$residual_var
+      ),
+    
+    c("$\\rho(u_{0j}, u_{1j})$",
+      "",
+      "",
+      "",
+      random_effects(model4)$cor_random_init_intercept
+      ),
+    c("$\\rho(u_{0j}, u_{2j})$",
+      "",
+      "",
+      "",
+      random_effects(model4)$cor_no_init_intercept
+      ),
+    c("$\\rho(u_{1j}, u_{2j})$",
+      "",
+      "",
+      "",
+      random_effects(model4)$cor_no_init_random_init
+      ),
+    c("$\\Delta$ deviance (df)",
+      "",
+      paste0(round(anova(model1, model2)$Chisq[2],2), " (", anova(model1, model2)$Df[2], ")", p_to_stars(anova(model1, model2)$'Pr(>Chisq)'[2])),
+      paste0(round(anova(model1, model3)$Chisq[2],2), " (", anova(model1, model3)$Df[2], ")", p_to_stars(anova(model1, model3)$'Pr(>Chisq)'[2])),
+      paste0(round(anova(model3, model4)$Chisq[2],2), " (", anova(model3, model4)$Df[2], ")", p_to_stars(anova(model3, model4)$'Pr(>Chisq)'[2]))
+  )
+  ),
+  #no.space = TRUE,
+  keep.stat = c("aic", "ll"),
+  star.cutoffs = NA,
+  notes.align	= "l",
+  # notes = "\\parbox{0.9\\textwidth}{Model 1 includes only initialization conditions, Model 2 adds within-dataset covariates, Model 3 adds between-dataset covariates, Model 4 adds random slopes for initialization, and Model 5 adds interaction terms. $^{*} p<0.1; ^{**} p<0.05; ^{***} p<0.01$}",
+  notes.label  = "",
+  notes = c(
+    "Model 1: only initialization conditions.",
+    "Model 2: adds within-dataset covariates.",
+    "Model 3: adds between-dataset covariates.",
+    "Model 4: adds random effects for initialization.",
+    "$^{*} p<0.1; ^{**} p<0.05; ^{***} p<0.01$"
+  ),
+  notes.append  = FALSE,
+  header = TRUE,
+  out = here::here("Report/results/results_table_presentation.tex")
+)
+
+
+
+```
+
+
+
+# Appendix
+
+### Is number of relevant records found a limited measure of starting performance?
+
+```{r}
+# calculate recall at 100 for each run
+simulation <- simulation %>%
+  mutate(
+    recall_at_100 = papers_found / included * 100
+  )
+
+#the percentage of runs which have perfect recall
+percent_perfect_recall <- simulation %>%
+  group_by(condition) %>%
+  summarise(
+    percent_perfect_recall = mean(recall_at_100 == 100) * 100
+  )
+
+#calculate variation in recall at 100 per condition
+variation_recall <- simulation %>%
+  group_by(condition) %>%
+  summarise(
+    sd_recall_at_100 = sd(recall_at_100)
+  )
+
+#join the two tables
+recall_summary <- percent_perfect_recall %>%
+  left_join(variation_recall, by = "condition")
+
+recall_summary
+```
+
+See mean recall at 100:
+
+```{r}
+descriptive_barchart(simulation, metadata, recall_at_100)
+```
 
 
 
 
 
+### Did the variable 'length_abstracts' actually have an effect on the length of the abstracts generated by the LLM?
 
+```{r}
+
+#llm_abstracts = here::here("simulation_results/inclusion_only/all_simulation_results.csv")
+
+```

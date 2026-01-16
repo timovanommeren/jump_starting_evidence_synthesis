@@ -20,18 +20,21 @@ def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset
     (dataset_names, simulation_results), = simulation_results.items() # comma enforces unpacking single item (since were doing only one dataset at a time)
 
     # pad the labels to ensure accurate simulation results (see Report section 4.2.1)
-    padded_labels_random = pad_labels(simulation_results['random']["label"].reset_index(drop=True), len([prior_idx]), len(dataset), stop_at_n)
-    padded_labels_llm = pad_labels(simulation_results['llm']["label"].reset_index(drop=True), 0, len(dataset_llms['dataset']), stop_at_n) # note that in the llm condition, the priors aren't part of the analyzed set so should not be considered in padding
-    padded_labels_criteria = pad_labels(simulation_results['criteria']["label"].reset_index(drop=True), 0, len(dataset_criteria['dataset']), stop_at_n) # idem for criteria condition
-    padded_labels_no_initialisation = pad_labels(simulation_results['no_initialisation']["label"].reset_index(drop=True), 0, len(dataset), stop_at_n)
+    # padded_labels_random = pad_labels(simulation_results['random']["label"].reset_index(drop=True), len([prior_idx]), len(dataset), stop_at_n)
+    # padded_labels_llm = pad_labels(simulation_results['llm']["label"].reset_index(drop=True), 0, len(dataset_llms['dataset']), stop_at_n) # note that in the llm condition, the priors aren't part of the analyzed set so should not be considered in padding
+    # padded_labels_criteria = pad_labels(simulation_results['criteria']["label"].reset_index(drop=True), 0, len(dataset_criteria['dataset']), stop_at_n) # idem for criteria condition
+    # padded_labels_no_initialisation = pad_labels(simulation_results['no_initialisation']["label"].reset_index(drop=True), 0, len(dataset), stop_at_n)
 
     # concatenate the three cumulative sum results in one dataframe for adding metadata and plottingq
     df_cumsum = pd.DataFrame({
-        'Random Initialization': padded_labels_random.cumsum(),
-        'LLM Initialization': padded_labels_llm.cumsum(),
-        'Criteria Initialization': padded_labels_criteria.cumsum(),
-        'No Initialization': padded_labels_no_initialisation.cumsum()
+        'Random Initialization': simulation_results['random']["label"].reset_index(drop=True).iloc[:100].cumsum(),
+        'LLM Initialization': simulation_results['llm']["label"].reset_index(drop=True).iloc[:100].cumsum(),
+        'Criteria Initialization': simulation_results['criteria']["label"].reset_index(drop=True).iloc[:100].cumsum(),
+        'No Initialization': simulation_results['no_initialisation']["label"].reset_index(drop=True).iloc[:100].cumsum()
     })
+    
+    # Calculate the actual number of runs (retrievals) performed
+    n_trials = len(simulation_results['random']["label"].reset_index(drop=True).iloc[:100])
     
     ############################################################################################################################################
     
@@ -60,50 +63,50 @@ def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset
  
     #### CALCULATE OUTCOME METRICS ############################################################################################################
 
-    # Calculate the number of relevant records found at TDD threshold
-    td_random = tdd_at(simulation_results['random'], tdd_threshold)[1]
-    td_llm = tdd_at(simulation_results['llm'], tdd_threshold)[1]
-    td_criteria = tdd_at(simulation_results['criteria'], tdd_threshold)[1]
-    td_no_initialisation = tdd_at(simulation_results['no_initialisation'], tdd_threshold)[1]
+    # Calculate the number of relevant records found at TDD threshold (capped at 100 rows)
+    td_random = tdd_at({'record_id': simulation_results['random']['record_id'].iloc[:100], 'label': simulation_results['random']['label'].iloc[:100]}, tdd_threshold)[1]
+    td_llm = tdd_at({'record_id': simulation_results['llm']['record_id'].iloc[:100], 'label': simulation_results['llm']['label'].iloc[:100]}, tdd_threshold)[1]
+    td_criteria = tdd_at({'record_id': simulation_results['criteria']['record_id'].iloc[:100], 'label': simulation_results['criteria']['label'].iloc[:100]}, tdd_threshold)[1]
+    td_no_initialisation = tdd_at({'record_id': simulation_results['no_initialisation']['record_id'].iloc[:100], 'label': simulation_results['no_initialisation']['label'].iloc[:100]}, tdd_threshold)[1]
 
     # Calculate the number of records that need to be screened to find the first relevant record (ATD)
-    atd_random = metrics._average_time_to_discovery(tdd_at(simulation_results['random'], tdd_threshold)[0])
-    atd_llm = metrics._average_time_to_discovery(tdd_at(simulation_results['llm'], tdd_threshold)[0])
-    atd_criteria = metrics._average_time_to_discovery(tdd_at(simulation_results['criteria'], tdd_threshold)[0])
-    atd_no_initialisation = metrics._average_time_to_discovery(tdd_at(simulation_results['no_initialisation'], tdd_threshold)[0])
+    atd_random = metrics._average_time_to_discovery(tdd_at({'record_id': simulation_results['random']['record_id'].iloc[:100], 'label': simulation_results['random']['label'].iloc[:100]}, tdd_threshold)[0])
+    atd_llm = metrics._average_time_to_discovery(tdd_at({'record_id': simulation_results['llm']['record_id'].iloc[:100], 'label': simulation_results['llm']['label'].iloc[:100]}, tdd_threshold)[0])
+    atd_criteria = metrics._average_time_to_discovery(tdd_at({'record_id': simulation_results['criteria']['record_id'].iloc[:100], 'label': simulation_results['criteria']['label'].iloc[:100]}, tdd_threshold)[0])
+    atd_no_initialisation = metrics._average_time_to_discovery(tdd_at({'record_id': simulation_results['no_initialisation']['record_id'].iloc[:100], 'label': simulation_results['no_initialisation']['label'].iloc[:100]}, tdd_threshold)[0])
 
-    # Calculate metrics only if relevant records were found before the stopping criterion was reached
-    nrr_random = loss(list(padded_labels_random)) if padded_labels_random.sum() > 0 else np.nan
-    nrr_llm = loss(list(padded_labels_llm)) if padded_labels_llm.sum() > 0 else np.nan
-    nrr_criteria = loss(list(padded_labels_criteria)) if padded_labels_criteria.sum() > 0 else np.nan
-    nrr_no_initialisation = loss(list(padded_labels_no_initialisation)) if padded_labels_no_initialisation.sum() > 0 else np.nan
+    # # Calculate metrics only if relevant records were found before the stopping criterion was reached
+    # nrr_random = loss(list(padded_labels_random)) if padded_labels_random.sum() > 0 else np.nan
+    # nrr_llm = loss(list(padded_labels_llm)) if padded_labels_llm.sum() > 0 else np.nan
+    # nrr_criteria = loss(list(padded_labels_criteria)) if padded_labels_criteria.sum() > 0 else np.nan
+    # nrr_no_initialisation = loss(list(padded_labels_no_initialisation)) if padded_labels_no_initialisation.sum() > 0 else np.nan
 
-    ndcg_score_random = ndcg(list(padded_labels_random)) if padded_labels_random.sum() > 0 else np.nan
-    ndcg_score_llm = ndcg(list(padded_labels_llm)) if padded_labels_llm.sum() > 0 else np.nan
-    ndcg_score_criteria = ndcg(list(padded_labels_criteria)) if padded_labels_criteria.sum() > 0 else np.nan
-    ndcg_score_no_initialisation = ndcg(list(padded_labels_no_initialisation)) if padded_labels_no_initialisation.sum() > 0 else np.nan
+    # ndcg_score_random = ndcg(list(padded_labels_random)) if padded_labels_random.sum() > 0 else np.nan
+    # ndcg_score_llm = ndcg(list(padded_labels_llm)) if padded_labels_llm.sum() > 0 else np.nan
+    # ndcg_score_criteria = ndcg(list(padded_labels_criteria)) if padded_labels_criteria.sum() > 0 else np.nan
+    # ndcg_score_no_initialisation = ndcg(list(padded_labels_no_initialisation)) if padded_labels_no_initialisation.sum() > 0 else np.nan
 
-    # Calculate the 'Work Saved over Sampling' (WSS) by obtaining all WSS values with provided ASReview function and then finding the WSS at the provided threshold
-    # Note: this code's logic mirrors that found in asreviewcontrib.insights.metrics._wss() but uses searchsorted on all wss values instead of _slice_metric() on ASReview object to determine which WSS value to select.
-    all_wss_random = algorithms._wss_values(padded_labels_random)
-    idx_random = np.searchsorted(all_wss_random[0], wss_threshold, side="right") - 1
-    idx_random = max(idx_random, 0)
-    wss_random = all_wss_random[1][idx_random] if padded_labels_random.sum() > 0 else np.nan # to avoid WSS calculation if no relevant records were found
+    # # Calculate the 'Work Saved over Sampling' (WSS) by obtaining all WSS values with provided ASReview function and then finding the WSS at the provided threshold
+    # # Note: this code's logic mirrors that found in asreviewcontrib.insights.metrics._wss() but uses searchsorted on all wss values instead of _slice_metric() on ASReview object to determine which WSS value to select.
+    # all_wss_random = algorithms._wss_values(padded_labels_random)
+    # idx_random = np.searchsorted(all_wss_random[0], wss_threshold, side="right") - 1
+    # idx_random = max(idx_random, 0)
+    # wss_random = all_wss_random[1][idx_random] if padded_labels_random.sum() > 0 else np.nan # to avoid WSS calculation if no relevant records were found
     
-    all_wss_llm = algorithms._wss_values(padded_labels_llm)
-    idx_llm = np.searchsorted(all_wss_llm[0], wss_threshold, side="right") - 1
-    idx_llm = max(idx_llm, 0)
-    wss_llm = all_wss_llm[1][idx_llm] if padded_labels_llm.sum() > 0 else np.nan
+    # all_wss_llm = algorithms._wss_values(padded_labels_llm)
+    # idx_llm = np.searchsorted(all_wss_llm[0], wss_threshold, side="right") - 1
+    # idx_llm = max(idx_llm, 0)
+    # wss_llm = all_wss_llm[1][idx_llm] if padded_labels_llm.sum() > 0 else np.nan
     
-    all_wss_criteria = algorithms._wss_values(padded_labels_criteria)
-    idx_criteria = np.searchsorted(all_wss_criteria[0], wss_threshold, side="right") - 1
-    idx_criteria = max(idx_criteria, 0)
-    wss_criteria = all_wss_criteria[1][idx_criteria] if padded_labels_criteria.sum() > 0 else np.nan
+    # all_wss_criteria = algorithms._wss_values(padded_labels_criteria)
+    # idx_criteria = np.searchsorted(all_wss_criteria[0], wss_threshold, side="right") - 1
+    # idx_criteria = max(idx_criteria, 0)
+    # wss_criteria = all_wss_criteria[1][idx_criteria] if padded_labels_criteria.sum() > 0 else np.nan
     
-    all_wss_no_initialisation = algorithms._wss_values(padded_labels_no_initialisation)
-    idx_no_initialisation = np.searchsorted(all_wss_no_initialisation[0], wss_threshold, side="right") - 1
-    idx_no_initialisation = max(idx_no_initialisation, 0)
-    wss_no_initialisation = all_wss_no_initialisation[1][idx_no_initialisation] if padded_labels_no_initialisation.sum() > 0 else np.nan
+    # all_wss_no_initialisation = algorithms._wss_values(padded_labels_no_initialisation)
+    # idx_no_initialisation = np.searchsorted(all_wss_no_initialisation[0], wss_threshold, side="right") - 1
+    # idx_no_initialisation = max(idx_no_initialisation, 0)
+    # wss_no_initialisation = all_wss_no_initialisation[1][idx_no_initialisation] if padded_labels_no_initialisation.sum() > 0 else np.nan
 
     ############################################################################################################################################
 
@@ -116,14 +119,14 @@ def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset
     results_row = []
 
     for condition, metrics_dict in [
-        ('random', {'nrr': nrr_random, 'ndcg': ndcg_score_random, 'papers_found': td_random, 
-                    'atd': atd_random, 'wss': wss_random}),
-        ('llm', {'nrr': nrr_llm, 'ndcg': ndcg_score_llm, 'papers_found': td_llm,
-                'atd': atd_llm, 'wss': wss_llm}),
-        ('criteria', {'nrr': nrr_criteria, 'ndcg': ndcg_score_criteria, 'papers_found': td_criteria,
-                      'atd': atd_criteria, 'wss': wss_criteria}),
-        ('no_initialisation', {'nrr': nrr_no_initialisation, 'ndcg': ndcg_score_no_initialisation, 'papers_found': td_no_initialisation,
-                    'atd': atd_no_initialisation, 'wss': wss_no_initialisation})
+        ('random', {'papers_found': td_random, 
+                    'atd': atd_random}),
+        ('llm', {'papers_found': td_llm,
+                'atd': atd_llm}),
+        ('criteria', {'papers_found': td_criteria,
+                      'atd': atd_criteria}),
+        ('no_initialisation', {'papers_found': td_no_initialisation,
+                    'atd': atd_no_initialisation})
     ]:
         for metric_name, metric_value in metrics_dict.items():
             
@@ -142,6 +145,7 @@ def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset
                 'wss@': wss_threshold,
                 'timestamp': pd.Timestamp.now().isoformat(),
                 'run': run,  # replicate ID
+                'n_trials': n_trials,  # number of attempted retrievals
             })
             
     # Append to master results file
@@ -226,7 +230,7 @@ def recall_plot(df_cumsum: pd.DataFrame, dataset_names: str, n_abstracts: int, l
 
 def aggregate_recall_plots(datasets: dict, out_dir: Path, stop_at_n: int) -> None:
   
-  for name in datasets.keys():
+  for name in datasets:
       
     raw_output = out_dir / name / 'raw_simulations'
         
@@ -253,25 +257,25 @@ def aggregate_recall_plots(datasets: dict, out_dir: Path, stop_at_n: int) -> Non
             no_initialisation_runs.append(df)   
             
     # For each method, first calculate cumsum for each run, then compute mean and SEM across runs
-    random_cumsums = [df['label'].cumsum().reset_index(drop=True) for df in random_runs]
+    random_cumsums = [df.loc[df["querier"].notna(), "label"].iloc[:stop_at_n].cumsum().reset_index(drop=True) for df in random_runs]
     agg_random = pd.DataFrame({
         'Cumulative Sum': pd.concat(random_cumsums, axis=1).mean(axis=1),
         'SE': pd.concat(random_cumsums, axis=1).sem(axis=1)
     })
 
-    llm_cumsums = [df['label'].cumsum().reset_index(drop=True) for df in llm_runs]
+    llm_cumsums = [df.loc[df["querier"].notna(), "label"].iloc[:stop_at_n].cumsum().reset_index(drop=True) for df in llm_runs]
     agg_llm = pd.DataFrame({
         'Cumulative Sum': pd.concat(llm_cumsums, axis=1).mean(axis=1),
         'SE': pd.concat(llm_cumsums, axis=1).sem(axis=1)
     })
     
-    criteria_cumsums = [df['label'].cumsum().reset_index(drop=True) for df in criteria_runs]
+    criteria_cumsums = [df.loc[df["querier"].notna(), "label"].iloc[:stop_at_n].cumsum().reset_index(drop=True) for df in criteria_runs]
     agg_criteria = pd.DataFrame({
         'Cumulative Sum': pd.concat(criteria_cumsums, axis=1).mean(axis=1),
         'SE': pd.concat(criteria_cumsums, axis=1).sem(axis=1)
     })
 
-    no_initialisation_cumsums = [df['label'].cumsum().reset_index(drop=True) for df in no_initialisation_runs]
+    no_initialisation_cumsums = [df.loc[df["querier"].notna(), "label"].iloc[:stop_at_n].cumsum().reset_index(drop=True) for df in no_initialisation_runs]
     agg_no_initialisation = pd.DataFrame({
         'Cumulative Sum': pd.concat(no_initialisation_cumsums, axis=1).mean(axis=1),
         'SE': pd.concat(no_initialisation_cumsums, axis=1).sem(axis=1)
@@ -284,21 +288,19 @@ def aggregate_recall_plots(datasets: dict, out_dir: Path, stop_at_n: int) -> Non
     
     plt.figure(figsize=(10, 6))
 
+    x_axis = range(1, stop_at_n + 1)
+
     # Use 1-based x-axis: screening 1 through stop_at_n
-    x_axis = range(1, len(agg_random['Cumulative Sum'][:stop_at_n]) + 1)
-    plt.plot(x_axis, agg_random['Cumulative Sum'][:stop_at_n], label='random Priors', color='blue')
+    plt.plot(x_axis, agg_random['Cumulative Sum'][:stop_at_n], label='True Example Condition', color='blue')
     plt.fill_between(x_axis, agg_random['Cumulative Sum'][:stop_at_n] - agg_random['SE'][:stop_at_n], agg_random['Cumulative Sum'][:stop_at_n] + agg_random['SE'][:stop_at_n], color='royalblue', alpha=0.3)
 
-    x_axis = range(1, len(agg_llm['Cumulative Sum'][:stop_at_n]) + 1)
-    plt.plot(x_axis, agg_llm['Cumulative Sum'][:stop_at_n], label='LLM Priors', color='green')
+    plt.plot(x_axis, agg_llm['Cumulative Sum'][:stop_at_n], label='LLM Condition', color='green')
     plt.fill_between(x_axis, agg_llm['Cumulative Sum'][:stop_at_n] - agg_llm['SE'][:stop_at_n], agg_llm['Cumulative Sum'][:stop_at_n] + agg_llm['SE'][:stop_at_n], color='forestgreen', alpha=0.3)
-
-    x_axis = range(1, len(agg_criteria['Cumulative Sum'][:stop_at_n]) + 1)
-    plt.plot(x_axis, agg_criteria['Cumulative Sum'][:stop_at_n], label='Criteria Priors', color='orange')
+    
+    plt.plot(x_axis, agg_criteria['Cumulative Sum'][:stop_at_n], label='Inclusion Criteria Condition', color='orange')
     plt.fill_between(x_axis, agg_criteria['Cumulative Sum'][:stop_at_n] - agg_criteria['SE'][:stop_at_n], agg_criteria['Cumulative Sum'][:stop_at_n] + agg_criteria['SE'][:stop_at_n], color='goldenrod', alpha=0.3)
-
-    x_axis = range(1, len(agg_no_initialisation['Cumulative Sum'][:stop_at_n]) + 1)
-    plt.plot(x_axis, agg_no_initialisation['Cumulative Sum'][:stop_at_n], label='No Priors', color='red')
+    
+    plt.plot(x_axis, agg_no_initialisation['Cumulative Sum'][:stop_at_n], label='Cold Start Condition', color='red')
     plt.fill_between(x_axis, agg_no_initialisation['Cumulative Sum'][:stop_at_n] - agg_no_initialisation['SE'][:stop_at_n], agg_no_initialisation['Cumulative Sum'][:stop_at_n] + agg_no_initialisation['SE'][:stop_at_n], color='lightsalmon', alpha=0.3)
 
     # Add dashed line at stop_at_n
