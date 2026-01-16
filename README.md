@@ -34,7 +34,7 @@ python -m venv .venv
 
 Activate the virtual environment:
 ```
-source .venv/bin/activate
+.venv/Scrips/activate
 ```
 
 Install the required Python dependencies:
