@@ -68,7 +68,7 @@ renv::restore()
 The analysis can then be run by either opening Analysis/R/main_analysis.Rmd in Rstudio or by running the line below directly in CLI from the root directory.  
 
 ```
-rmarkdown::render("Analysis/R/main_analysis.Rmd")
+rmarkdown::render("Analysis/R/Markup_Assignment.Rmd")
 ```
 
 (Note that if the simulation results were downloaded from OSF directly, these should be stored as ../simulation_results/run_01/all_simulation_results.csv for the R markdown code to run smoothly.)
