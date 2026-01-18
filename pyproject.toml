@@ -1,0 +1,19 @@
+# pyproject.toml
+
+[tool.jumpstart]
+
+# ---- global ----
+n_simulations = 1
+stop_at_n = 100   # use -1 for "run to completion"
+
+# ---- independent variables (grids) ----
+n_abstracts = [1] #[1, 4, 7]
+length_abstracts = [500] #[100, 500, 900]
+llm_temperature = [0.4] #[0.0, 0.4, 0.8]
+
+# ---- LLM stimulus ----
+stimulus_for_llm = ["inclusion_criteria"]
+
+
+# ---- names of datasets to use ----
+subset_datasets = ['Bos_2018', 'Brouwer_2019']
