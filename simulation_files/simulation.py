@@ -15,7 +15,7 @@ from metrics import evaluate_simulation
 
 
 
-def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.ExcelFile, n_abstracts: int, length_abstracts: int, llm_temperature: float, wss_threshold: float, tdd_threshold: int, run: int, stop_at_n: int) -> dict:
+def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.ExcelFile, n_abstracts: int, length_abstracts: int, llm_temperature: float, papers_screened: int, run: int, stop_at_n: int) -> dict:
 
     for dataset_names in datasets.keys():
         
@@ -134,8 +134,7 @@ def run_simulation(datasets: dict, criterium: list, out_dir: Path, metadata: pd.
                             n_abstracts=n_abstracts, 
                             length_abstracts=length_abstracts, 
                             llm_temperature=llm_temperature, 
-                            wss_threshold=wss_threshold, 
-                            tdd_threshold=tdd_threshold, 
+                            papers_screened=papers_screened, 
                             out_dir=out_dir, 
                             run=run, 
                             stop_at_n=stop_at_n)

@@ -13,7 +13,7 @@ from asreviewcontrib.insights import algorithms
 from asreviewcontrib.insights import metrics
 
 
-def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset_llms: pd.DataFrame, dataset_criteria: pd.DataFrame, prior_idx: list, n_abstracts: int, length_abstracts: int, llm_temperature: float, wss_threshold: float, tdd_threshold: int, out_dir: Path, run: int, stop_at_n: int) -> None:
+def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset_llms: pd.DataFrame, dataset_criteria: pd.DataFrame, prior_idx: list, n_abstracts: int, length_abstracts: int, llm_temperature: float, papers_screened: int, out_dir: Path, run: int, stop_at_n: int) -> None:
 
     ### PREPARE DATA FOR EVALUATION ############################################################################################################
 
@@ -64,49 +64,16 @@ def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset
     #### CALCULATE OUTCOME METRICS ############################################################################################################
 
     # Calculate the number of relevant records found at TDD threshold (capped at 100 rows)
-    td_random = tdd_at({'record_id': simulation_results['random']['record_id'].iloc[:100], 'label': simulation_results['random']['label'].iloc[:100]}, tdd_threshold)[1]
-    td_llm = tdd_at({'record_id': simulation_results['llm']['record_id'].iloc[:100], 'label': simulation_results['llm']['label'].iloc[:100]}, tdd_threshold)[1]
-    td_criteria = tdd_at({'record_id': simulation_results['criteria']['record_id'].iloc[:100], 'label': simulation_results['criteria']['label'].iloc[:100]}, tdd_threshold)[1]
-    td_no_initialisation = tdd_at({'record_id': simulation_results['no_initialisation']['record_id'].iloc[:100], 'label': simulation_results['no_initialisation']['label'].iloc[:100]}, tdd_threshold)[1]
+    td_random = tdd_at({'record_id': simulation_results['random']['record_id'].iloc[:100], 'label': simulation_results['random']['label'].iloc[:100]}, papers_screened)[1]
+    td_llm = tdd_at({'record_id': simulation_results['llm']['record_id'].iloc[:100], 'label': simulation_results['llm']['label'].iloc[:100]}, papers_screened)[1]
+    td_criteria = tdd_at({'record_id': simulation_results['criteria']['record_id'].iloc[:100], 'label': simulation_results['criteria']['label'].iloc[:100]}, papers_screened)[1]
+    td_no_initialisation = tdd_at({'record_id': simulation_results['no_initialisation']['record_id'].iloc[:100], 'label': simulation_results['no_initialisation']['label'].iloc[:100]}, papers_screened)[1]
 
     # Calculate the number of records that need to be screened to find the first relevant record (ATD)
-    atd_random = metrics._average_time_to_discovery(tdd_at({'record_id': simulation_results['random']['record_id'].iloc[:100], 'label': simulation_results['random']['label'].iloc[:100]}, tdd_threshold)[0])
-    atd_llm = metrics._average_time_to_discovery(tdd_at({'record_id': simulation_results['llm']['record_id'].iloc[:100], 'label': simulation_results['llm']['label'].iloc[:100]}, tdd_threshold)[0])
-    atd_criteria = metrics._average_time_to_discovery(tdd_at({'record_id': simulation_results['criteria']['record_id'].iloc[:100], 'label': simulation_results['criteria']['label'].iloc[:100]}, tdd_threshold)[0])
-    atd_no_initialisation = metrics._average_time_to_discovery(tdd_at({'record_id': simulation_results['no_initialisation']['record_id'].iloc[:100], 'label': simulation_results['no_initialisation']['label'].iloc[:100]}, tdd_threshold)[0])
-
-    # # Calculate metrics only if relevant records were found before the stopping criterion was reached
-    # nrr_random = loss(list(padded_labels_random)) if padded_labels_random.sum() > 0 else np.nan
-    # nrr_llm = loss(list(padded_labels_llm)) if padded_labels_llm.sum() > 0 else np.nan
-    # nrr_criteria = loss(list(padded_labels_criteria)) if padded_labels_criteria.sum() > 0 else np.nan
-    # nrr_no_initialisation = loss(list(padded_labels_no_initialisation)) if padded_labels_no_initialisation.sum() > 0 else np.nan
-
-    # ndcg_score_random = ndcg(list(padded_labels_random)) if padded_labels_random.sum() > 0 else np.nan
-    # ndcg_score_llm = ndcg(list(padded_labels_llm)) if padded_labels_llm.sum() > 0 else np.nan
-    # ndcg_score_criteria = ndcg(list(padded_labels_criteria)) if padded_labels_criteria.sum() > 0 else np.nan
-    # ndcg_score_no_initialisation = ndcg(list(padded_labels_no_initialisation)) if padded_labels_no_initialisation.sum() > 0 else np.nan
-
-    # # Calculate the 'Work Saved over Sampling' (WSS) by obtaining all WSS values with provided ASReview function and then finding the WSS at the provided threshold
-    # # Note: this code's logic mirrors that found in asreviewcontrib.insights.metrics._wss() but uses searchsorted on all wss values instead of _slice_metric() on ASReview object to determine which WSS value to select.
-    # all_wss_random = algorithms._wss_values(padded_labels_random)
-    # idx_random = np.searchsorted(all_wss_random[0], wss_threshold, side="right") - 1
-    # idx_random = max(idx_random, 0)
-    # wss_random = all_wss_random[1][idx_random] if padded_labels_random.sum() > 0 else np.nan # to avoid WSS calculation if no relevant records were found
-    
-    # all_wss_llm = algorithms._wss_values(padded_labels_llm)
-    # idx_llm = np.searchsorted(all_wss_llm[0], wss_threshold, side="right") - 1
-    # idx_llm = max(idx_llm, 0)
-    # wss_llm = all_wss_llm[1][idx_llm] if padded_labels_llm.sum() > 0 else np.nan
-    
-    # all_wss_criteria = algorithms._wss_values(padded_labels_criteria)
-    # idx_criteria = np.searchsorted(all_wss_criteria[0], wss_threshold, side="right") - 1
-    # idx_criteria = max(idx_criteria, 0)
-    # wss_criteria = all_wss_criteria[1][idx_criteria] if padded_labels_criteria.sum() > 0 else np.nan
-    
-    # all_wss_no_initialisation = algorithms._wss_values(padded_labels_no_initialisation)
-    # idx_no_initialisation = np.searchsorted(all_wss_no_initialisation[0], wss_threshold, side="right") - 1
-    # idx_no_initialisation = max(idx_no_initialisation, 0)
-    # wss_no_initialisation = all_wss_no_initialisation[1][idx_no_initialisation] if padded_labels_no_initialisation.sum() > 0 else np.nan
+    atd_random = metrics._average_time_to_discovery(tdd_at({'record_id': simulation_results['random']['record_id'].iloc[:100], 'label': simulation_results['random']['label'].iloc[:100]}, papers_screened)[0])
+    atd_llm = metrics._average_time_to_discovery(tdd_at({'record_id': simulation_results['llm']['record_id'].iloc[:100], 'label': simulation_results['llm']['label'].iloc[:100]}, papers_screened)[0])
+    atd_criteria = metrics._average_time_to_discovery(tdd_at({'record_id': simulation_results['criteria']['record_id'].iloc[:100], 'label': simulation_results['criteria']['label'].iloc[:100]}, papers_screened)[0])
+    atd_no_initialisation = metrics._average_time_to_discovery(tdd_at({'record_id': simulation_results['no_initialisation']['record_id'].iloc[:100], 'label': simulation_results['no_initialisation']['label'].iloc[:100]}, papers_screened)[0])
 
     ############################################################################################################################################
 
@@ -141,8 +108,7 @@ def evaluate_simulation(simulation_results: dict, dataset: pd.DataFrame, dataset
                 'n_abstracts': n_abstracts if is_llm else np.nan,
                 'length_abstracts': length_abstracts if is_llm else np.nan,
                 'llm_temperature': llm_temperature if is_llm else np.nan,
-                'tdd@': tdd_threshold,
-                'wss@': wss_threshold,
+                'tdd@': papers_screened,
                 'timestamp': pd.Timestamp.now().isoformat(),
                 'run': run,  # replicate ID
                 'n_trials': n_trials,  # number of attempted retrievals

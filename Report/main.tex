@@ -1,11 +1,8 @@
 % main.tex
 \documentclass[12pt]{article}
 
-
-
 % Import formatting & packages
-\input{preamble}
-
+\input{preamble.tex}
 
 \begin{document}
 
@@ -237,6 +234,8 @@ Note: explictly state that we take an exploratory approach, so no correction for
 \section{Results (note: preliminary!)}
 
 \subsection{Descriptives}
+
+\input{results/descriptives_table.tex}
 
 As expected, most of the variance in starting performance seems to be explained by differences between datasets. Figure \ref{fig:all-datasets} shows the number of relevant records found within the first 100 screened per dataset. There is considerable variation between datasets, with some datasets yielding less than 10 relevant records found across conditions, while other datasets yield more than 50 relevant records across conditions.
 

@@ -22,7 +22,7 @@ source(here("Analysis/R/03_descriptives.R"))
 ```{r load and transform data}
 
 # import simulation results and metadata (specify paths relative to project root)
-raw <- load_simulation_data(data = "simulation_results/run_01/all_simulation_results.csv", 
+raw <- load_simulation_data(data = "simulation_results/test/all_simulation_results.csv", 
                              metadata = "Analysis/percentage_relevant.csv")
 
 # (1) transform simulation data to wide
@@ -342,11 +342,11 @@ emm
 
 
 ```{r}
-simulationOutput_bin_model1 <- simulateResiduals(fittedModel = bin_model1, plot = F, n = 1000, re.form = NULL)
+simulationOutput_bin_model1 <-  DHARMa::simulateResiduals(fittedModel = bin_model1, plot = F, n = 1000, re.form = NULL)
 
 DHARMa::testOutliers(simulationOutput_bin_model1, type = "bootstrap")
-plotQQunif(simulationOutput_bin_model1)
-plotResiduals(simulationOutput_bin_model1, form = simulation$condition)
+DHARMa::plotQQunif(simulationOutput_bin_model1)
+DHARMa::plotResiduals(simulationOutput_bin_model1, form = simulation$condition)
 ```
 
 ```{r}
@@ -386,14 +386,14 @@ performance::r2_nakagawa(betabin_model1)
 ```
 
 ```{r}
-simulationOutput_betabin_model0 <- simulateResiduals(fittedModel = betabin_model0, plot = F, n = 1000, re.form = NULL)
+simulationOutput_betabin_model0 <-  DHARMa::simulateResiduals(fittedModel = betabin_model0, plot = F, n = 1000, re.form = NULL)
 
 DHARMa::testOutliers(simulationOutput_betabin_model0, type = "bootstrap")
-plotQQunif(simulationOutput_betabin_model0)
-plotResiduals(simulationOutput_betabin_model0, form = simulation$condition)
+DHARMa::plotQQunif(simulationOutput_betabin_model0)
+DHARMa::plotResiduals(simulationOutput_betabin_model0, form = simulation$condition)
 
-plotResiduals(simulationOutput_betabin_model0, simulation$dataset)
-testZeroInflation(simulationOutput_betabin_model0)
+DHARMa::plotResiduals(simulationOutput_betabin_model0, simulation$dataset)
+ DHARMa::testZeroInflation(simulationOutput_betabin_model0)
 ```
 
 
@@ -419,14 +419,14 @@ emm
 
 
 ```{r}
-simulationOutput_betabin_model1 <- simulateResiduals(fittedModel = betabin_model1, plot = F, n = 1000, re.form = NULL)
+simulationOutput_betabin_model1 <-  DHARMa::simulateResiduals(fittedModel = betabin_model1, plot = F, n = 1000, re.form = NULL)
 
 DHARMa::testOutliers(simulationOutput_betabin_model1, type = "bootstrap")
-plotQQunif(simulationOutput_betabin_model1)
-plotResiduals(simulationOutput_betabin_model1, form = simulation$condition)
+DHARMa::plotQQunif(simulationOutput_betabin_model1)
+DHARMa::plotResiduals(simulationOutput_betabin_model1, form = simulation$condition)
 
-plotResiduals(simulationOutput_betabin_model1, simulation$dataset)
-testZeroInflation(simulationOutput_betabin_model1)
+DHARMa::plotResiduals(simulationOutput_betabin_model1, simulation$dataset)
+ DHARMa::testZeroInflation(simulationOutput_betabin_model1)
 ```
 
 
@@ -619,12 +619,12 @@ A bottom-up modeling approach is used to build the mixed effects model. We start
 The negative correlations between the random intercepts and random slopes indicate that in datasets where performance under the reference condition (LLM) is higher than average, the drop in performance when using minimal or no_priors instead of LLM is larger than average. In other words, the effect of initialization was more pronounced for datasets where the overall performance was higher in general. Some datasets are simply easier for the active learning model of ASReview: many relevant records can be found early. In those ‘easier’ datasets, LLM-based initialization tends to create an especially large advantage over minimal or no_priors, which is reflected in the strong negative correlations between the random intercept and the random slopes.
 
 ```{r}
-model5 <- lme4::lmer(papers_found ~ condition + percent_rel + condition*records + (condition|dataset), REML = F, data = simulation)
+model5 <- lme4::lmer(papers_found ~ condition + percent_rel + (condition|dataset), REML = F, data = simulation)
 summary(model5)
 anova(model5, model4)
 
-simulationOutput_normel_model5 <- simulateResiduals(fittedModel = model5, plot = F)
-plotResiduals(simulationOutput_normel_model5, simulation$dataset)
+simulationOutput_normel_model5 <-  DHARMa::simulateResiduals(fittedModel = model5, plot = F)
+DHARMa::plotResiduals(simulationOutput_normel_model5, simulation$dataset)
 ```
 
 ### Checking normality of residuals
