@@ -7,7 +7,8 @@ In short, the contents of this repository allow for:
 2. A replication of the analysis only in R,
 3. To render the final research report in Latex.
 
-Note that the results of the simulation study are provided on [OSF](https://osf.io/4ebmk/files/osfstorage).
+Please note that a OpenAI API Key is required to run the simulation study. The results of the simulation study are provided on [OSF](https://osf.io/4ebmk/files/osfstorage). 
+
 
 ## Replication of simulation study in Python
 
