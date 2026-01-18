@@ -77,6 +77,6 @@ rmarkdown::render("Analysis/R/main_analysis.Rmd")
 
 After running the statistical analysis in R, it is possible to run the main.tex file to generate a pdf of the research report:
 ```
-latexmk -pdf -shell-escape main.tex
+latexmk -cd -pdf -shell-escape Report/main.tex
 ```
 
