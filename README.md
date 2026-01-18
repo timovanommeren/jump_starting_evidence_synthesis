@@ -29,7 +29,7 @@ The easiest way to replicate the simulation study, is by running the simulation 
 
 Open a terminal and create a new virtual environment:
 ```
-python -m venv .venv
+py -3.13 -m venv .venv
 ```
 
 Activate the virtual environment:
