@@ -60,15 +60,15 @@ Please note that the resulting files may differ slightly from the results presen
 
 ## Replication of the statistical analysis in R
 
-Start by downloading all the necessary R packages.
+Open the R project file in your directory, Next, download all the necessary R packages.
 
 ```r
 renv::restore()  
 ```
 
-The analysis can then be run by either opening Analysis/R/main_analysis.Rmd in Rstudio or by running the line below directly in CLI from the root directory.  
+Finally, run the statistical analysis by knitting the R markdown file titled 'Markup_Assignment.Rmd'.
 
-```
+```r
 rmarkdown::render("Analysis/R/Markup_Assignment.Rmd")
 ```
 
@@ -76,7 +76,10 @@ rmarkdown::render("Analysis/R/Markup_Assignment.Rmd")
 
 ## Knitting the research report
 
-After running the statistical analysis in R, it is possible to run the main.tex file to generate a pdf of the research report:
+After running the statistical analysis in R, compile the report using either:
+
+- **VS Code**: open `Report/main.tex` and build with the _LaTeX Workshop_ extension.
+- **Directly in CMD**:
 ```
 latexmk -cd -pdf -shell-escape Report/main.tex
 ```
